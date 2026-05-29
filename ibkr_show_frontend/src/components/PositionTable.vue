@@ -101,7 +101,7 @@ function onRowClick(event: { data: PositionItem }): void {
 </script>
 
 <template>
-  <div class="table-shell">
+  <div class="table-shell table-shell--desktop">
     <DataTable
       :value="sortedItems"
       class="terminal-datatable position-datatable"
@@ -228,6 +228,51 @@ function onRowClick(event: { data: PositionItem }): void {
       </Column>
     </DataTable>
   </div>
+
+  <div class="mobile-data-list">
+    <button
+      v-for="item in sortedItems"
+      :key="`${item.account_id}-${item.symbol}-${item.asset_class}`"
+      type="button"
+      class="mobile-data-card position-mobile-card"
+      @click="emit('select', item)"
+    >
+      <div class="mobile-data-card__header">
+        <div class="mobile-data-card__title">
+          <strong>{{ item.symbol ?? '--' }}</strong>
+          <small>{{ item.description ?? '无名称' }}</small>
+        </div>
+        <strong>{{ percentText(item.percent_of_nav) }}</strong>
+      </div>
+
+      <div class="mobile-data-grid">
+        <div class="mobile-data-row">
+          <span>持仓市值</span>
+          <strong>{{ formatNumber(item.position_value, 2) }}</strong>
+        </div>
+        <div class="mobile-data-row">
+          <span>数量</span>
+          <strong>{{ formatNumber(item.quantity, 4) }}</strong>
+        </div>
+        <div class="mobile-data-row">
+          <span>日涨跌</span>
+          <strong :class="pnlClass(item.previous_day_change_percent)">{{ signedPercentText(item.previous_day_change_percent) }}</strong>
+        </div>
+        <div class="mobile-data-row">
+          <span>未实现盈亏</span>
+          <strong :class="pnlClass(item.total_unrealized_pnl)">{{ formatNumber(item.total_unrealized_pnl, 2) }}</strong>
+        </div>
+        <div class="mobile-data-row">
+          <span>已实现盈亏</span>
+          <strong :class="pnlClass(item.total_realized_pnl)">{{ formatNumber(item.total_realized_pnl, 2) }}</strong>
+        </div>
+        <div class="mobile-data-row">
+          <span>成本</span>
+          <strong>{{ formatNumber(item.cost_basis_money, 2) }}</strong>
+        </div>
+      </div>
+    </button>
+  </div>
 </template>
 
 <style scoped>
@@ -305,5 +350,17 @@ function onRowClick(event: { data: PositionItem }): void {
 
 .position-datatable :deep(.p-datatable-tbody > tr:hover > td) {
   background: rgba(86, 213, 255, 0.04);
+}
+
+.position-mobile-card {
+  width: 100%;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.position-mobile-card:hover {
+  border-color: rgba(86, 213, 255, 0.34);
+  background: rgba(19, 42, 70, 0.82);
 }
 </style>

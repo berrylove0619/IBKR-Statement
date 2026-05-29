@@ -18,8 +18,33 @@ htmlcov/
 # Logs
 *.log
 
-# Env files
+# Env / secrets
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Runtime data
+data/
+logs/
+ibkr_show_backend/data/
+ibkr_show_worker/data/
+
+# Broker exports / user data
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.sqlite
+*.db
+*.sqlite3
+
+# Keep demo sample data
+!ibkr_show_worker/worker/fixtures/daily_sample.csv
 
 # macOS
 .DS_Store
@@ -27,6 +52,9 @@ htmlcov/
 # IDE
 .idea/
 .vscode/
+
+# Docker
+docker-compose.override.yml
 
 # Local public mirror workspace
 public_repo_staging/

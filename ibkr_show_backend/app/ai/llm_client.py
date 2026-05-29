@@ -1,5 +1,17 @@
+from app.core.config import get_settings
+from app.services.llm_service import LLMService
+
+
 class LLMClient:
-    """Placeholder client for future LLM integrations."""
+    """Compatibility wrapper that routes AI calls through LLMService."""
+
+    def __init__(self, llm_service: LLMService | None = None) -> None:
+        self.llm_service = llm_service or LLMService(get_settings())
 
     def generate(self, prompt: str) -> str:
-        return f"LLM placeholder response for prompt: {prompt}"
+        return self.llm_service.chat(
+            [
+                {"role": "system", "content": "You are a concise assistant."},
+                {"role": "user", "content": prompt},
+            ]
+        )

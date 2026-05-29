@@ -57,7 +57,7 @@ function sortIndicator(
 </script>
 
 <template>
-  <div class="table-shell">
+  <div class="table-shell table-shell--desktop">
     <DataTable :value="items" class="terminal-datatable">
       <template #empty>
         <div class="empty-state">当前筛选条件下没有出入金记录</div>
@@ -123,6 +123,38 @@ function sortIndicator(
         </template>
       </Column>
     </DataTable>
+  </div>
+
+  <div class="mobile-data-list">
+    <article v-for="item in items" :key="item.transaction_id || `${item.date_time}-${item.amount}`" class="mobile-data-card">
+      <div class="mobile-data-card__header">
+        <div class="mobile-data-card__title">
+          <strong :class="amountClass(item.amount)">{{ formatNumber(item.amount, 2) }}</strong>
+          <small>{{ item.currency ?? '--' }}</small>
+        </div>
+        <Tag :value="directionLabel(item.flow_direction)" class="p-tag" :class="directionClass(item.flow_direction)" />
+      </div>
+
+      <div class="mobile-data-grid">
+        <div class="mobile-data-row">
+          <span>发生时间</span>
+          <strong>{{ item.date_time ?? item.report_date ?? '--' }}</strong>
+        </div>
+        <div class="mobile-data-row">
+          <span>结算日</span>
+          <strong>{{ item.settle_date ?? '--' }}</strong>
+        </div>
+      </div>
+
+      <div class="mobile-data-row">
+        <span>说明</span>
+        <strong>{{ item.description ?? '--' }}</strong>
+      </div>
+      <div class="mobile-data-row">
+        <span>流水号</span>
+        <strong>{{ item.transaction_id ?? '--' }}</strong>
+      </div>
+    </article>
   </div>
 </template>
 

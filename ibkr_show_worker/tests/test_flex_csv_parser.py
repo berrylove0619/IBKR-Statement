@@ -2,9 +2,11 @@ from pathlib import Path
 
 from worker.parsers.flex_csv_parser import parse_flex_csv
 
+FIXTURES_DIR = Path(__file__).resolve().parents[1] / "worker" / "fixtures"
+
 
 def test_parse_flex_csv_extracts_sections_and_metadata() -> None:
-    fixture = Path("worker/fixtures/daily_sample.csv")
+    fixture = FIXTURES_DIR / "daily_sample.csv"
     statement = parse_flex_csv(fixture)
 
     assert statement.metadata.query_name == "Daily Snapshot"

@@ -52,6 +52,7 @@ def test_protected_trade_routes_require_login() -> None:
 
 
 def test_login_sets_cookie_and_unlocks_trade_routes() -> None:
+    get_settings.cache_clear()
     settings = get_settings()
     app.dependency_overrides[get_trade_service] = DummyTradeService
 

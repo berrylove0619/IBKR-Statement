@@ -1,0 +1,97 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=${ES_JAVA_OPTS:--Xms512m -Xmx512m}
+    ports:
+      - "${ES_PORT:-9200}:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - backend-data:/app/ibkr_show_backend/data
+    env_file: .env
+    environment:
+      - ES_HOST=http://elasticsearch:9200
+      - REDIS_URL=redis://redis:6379/0
+      - BACKEND_BASE_URL=http://backend:8000
+      - APP_ENV=${APP_ENV:-docker}
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker-init:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    command: ["/app/docker/entrypoint-worker-init.sh"]
+    volumes:
+      - backend-data:/app/ibkr_show_backend/data
+    env_file: .env
+    environment:
+      - ES_HOST=http://elasticsearch:9200
+      - REDIS_URL=redis://redis:6379/0
+      - BACKEND_BASE_URL=http://backend:8000
+      - DEMO_MODE=${DEMO_MODE:-true}
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: "no"
+
+  worker-scheduler:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    command: ["python", "-m", "worker.main", "run-scheduler"]
+    volumes:
+      - backend-data:/app/ibkr_show_backend/data
+    env_file: .env
+    environment:
+      - ES_HOST=http://elasticsearch:9200
+      - REDIS_URL=redis://redis:6379/0
+      - BACKEND_BASE_URL=http://backend:8000
+    depends_on:
+      worker-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      - backend
+
+volumes:
+  es-data:
+  redis-data:
+  backend-data:

@@ -28,6 +28,15 @@ class RedisCacheClient:
     def enabled(self) -> bool:
         return self._client is not None
 
+    def ping(self) -> bool:
+        if self._client is None:
+            return False
+        try:
+            return bool(self._client.ping())
+        except RedisError:
+            logger.exception("redis ping failed")
+            return False
+
     def build_key(self, *parts: str) -> str:
         suffix = ":".join(part for part in parts if part)
         if suffix:

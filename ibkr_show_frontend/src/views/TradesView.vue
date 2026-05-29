@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Paginator from 'primevue/paginator'
@@ -10,6 +11,8 @@ import LoadingBlock from '@/components/LoadingBlock.vue'
 import StatCard from '@/components/StatCard.vue'
 import TradeTable from '@/components/TradeTable.vue'
 import type { TradeItem, TradeListResponse, TradeSummaryResponse } from '@/types/trades'
+
+const router = useRouter()
 
 const state = reactive({
   start_date: '',
@@ -23,9 +26,12 @@ const state = reactive({
 const tradeResponse = ref<TradeListResponse | null>(null)
 const tradeSummary = ref<TradeSummaryResponse | null>(null)
 const loading = ref(true)
+const exporting = ref(false)
 const errorMessage = ref('')
 const sortKey = ref<'proceeds' | 'fifo_pnl_realized' | null>(null)
 const sortOrder = ref<'asc' | 'desc'>('desc')
+
+const EXPORT_PAGE_SIZE = 200
 
 function formatNumber(value: number | null, digits = 2): string {
   if (value === null) {
@@ -43,17 +49,21 @@ function currentSortBy(): 'date_time' | 'proceeds' | 'fifo_pnl_realized' {
   return sortKey.value ?? 'date_time'
 }
 
+function currentFilters() {
+  return {
+    start_date: state.start_date,
+    end_date: state.end_date,
+    symbol: state.symbol.trim().toUpperCase(),
+    buy_sell: state.buy_sell,
+  }
+}
+
 async function loadTrades(): Promise<void> {
   loading.value = true
   errorMessage.value = ''
 
   try {
-    const filters = {
-      start_date: state.start_date,
-      end_date: state.end_date,
-      symbol: state.symbol.trim().toUpperCase(),
-      buy_sell: state.buy_sell,
-    }
+    const filters = currentFilters()
     const [summaryResponse, listResponse] = await Promise.all([
       fetchTradeSummary(filters),
       fetchTrades({
@@ -70,6 +80,118 @@ async function loadTrades(): Promise<void> {
     errorMessage.value = error instanceof Error ? error.message : '加载交易记录失败'
   } finally {
     loading.value = false
+  }
+}
+
+function reviewTradeId(item: TradeItem): string {
+  return item.trade_id || item.transaction_id || ''
+}
+
+function formatSide(value: string | null): string {
+  if (value === 'BUY') {
+    return '买入'
+  }
+  if (value === 'SELL') {
+    return '卖出'
+  }
+  return value ?? '--'
+}
+
+function csvCell(value: string | number | null | undefined): string {
+  const normalizedValue = value === null || value === undefined || value === '' ? '--' : String(value)
+  return `"${normalizedValue.replace(/"/g, '""')}"`
+}
+
+function buildTradeCsv(items: TradeItem[]): string {
+  const headers = [
+    '成交时间',
+    '交易日期',
+    '复盘ID',
+    '代码',
+    '名称',
+    '资产类型',
+    '方向',
+    '数量',
+    '成交价',
+    '成交金额',
+    '佣金',
+    '已实现盈亏',
+    '交易所',
+  ]
+  const rows = items.map((item) => [
+    item.date_time,
+    item.trade_date,
+    reviewTradeId(item),
+    item.symbol,
+    item.description,
+    item.asset_class,
+    formatSide(item.buy_sell),
+    item.quantity,
+    item.trade_price,
+    item.proceeds,
+    item.ib_commission,
+    item.fifo_pnl_realized,
+    item.exchange,
+  ])
+  return [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')
+}
+
+function downloadCsv(content: string): void {
+  const now = new Date()
+  const timestamp = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+  ].join('')
+  const blob = new Blob([`\uFEFF${content}`], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `ibkr-trades-${timestamp}.csv`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+async function exportTrades(): Promise<void> {
+  if (exporting.value) {
+    return
+  }
+
+  exporting.value = true
+  errorMessage.value = ''
+
+  try {
+    const filters = currentFilters()
+    const firstResponse = await fetchTrades({
+      ...filters,
+      sort_by: currentSortBy(),
+      sort_order: sortOrder.value,
+      page: 1,
+      page_size: EXPORT_PAGE_SIZE,
+    })
+    const allItems = [...firstResponse.items]
+    const totalPages = firstResponse.pagination.total_pages
+
+    for (let page = 2; page <= totalPages; page += 1) {
+      const response = await fetchTrades({
+        ...filters,
+        sort_by: currentSortBy(),
+        sort_order: sortOrder.value,
+        page,
+        page_size: EXPORT_PAGE_SIZE,
+      })
+      allItems.push(...response.items)
+    }
+
+    downloadCsv(buildTradeCsv(allItems))
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : '导出交易记录失败'
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -105,6 +227,13 @@ function toneByNumber(value: number | null | undefined): 'positive' | 'negative'
     return 'neutral'
   }
   return value > 0 ? 'positive' : 'negative'
+}
+
+function reviewTrade(tradeId: string): void {
+  void router.push({
+    path: '/agent/trade-review',
+    query: { tab: 'symbol-review', trade_id: tradeId },
+  })
 }
 
 onMounted(() => {
@@ -159,7 +288,15 @@ onMounted(() => {
             </div>
           </div>
           <div class="field-stack field-stack--action">
-            <Button label="刷新交易" icon="pi pi-search" class="p-button p-button--accent" type="submit" />
+            <Button
+              :label="exporting ? '导出中' : '导出 CSV'"
+              :icon="exporting ? 'pi pi-spin pi-spinner' : 'pi pi-download'"
+              class="p-button p-button--ghost trade-filter-action-button"
+              type="button"
+              :disabled="exporting || loading"
+              @click="exportTrades"
+            />
+            <Button label="刷新交易" icon="pi pi-search" class="p-button p-button--accent trade-filter-action-button" type="submit" />
           </div>
         </form>
       </div>
@@ -184,7 +321,7 @@ onMounted(() => {
           <div class="section-header">
             <div>
               <h2 class="panel-title">交易明细表</h2>
-              <p class="panel-subtitle">点击表头可按成交金额和已实现盈亏排序。</p>
+              <p class="panel-subtitle">点击表头可排序；点击复盘ID可复制，或直接复盘本交易。</p>
             </div>
           </div>
           <template v-if="tradeItems.length > 0">
@@ -194,6 +331,7 @@ onMounted(() => {
               :sort-key="sortKey"
               :sort-order="sortOrder"
               :on-sort="setSort"
+              @review-trade="reviewTrade"
             />
             <Paginator
               :rows="state.page_size"
@@ -242,6 +380,19 @@ onMounted(() => {
 .trade-side-toggle__helper {
   font-size: 0.82rem;
   color: var(--color-text-secondary);
+}
+
+.field-stack--action {
+  display: grid;
+  grid-template-rows: 44px 44px;
+  gap: 10px;
+}
+
+.trade-filter-action-button {
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
 }
 
 @media (max-width: 1200px) {

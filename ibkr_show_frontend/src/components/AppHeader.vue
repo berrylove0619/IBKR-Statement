@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
 
 import { useAuthSession } from '@/auth/session'
+import { fetchDailyPositionReviewDates } from '@/api/dailyPositionReview'
 import { useAccountOverviewData } from '@/composables/accountOverview'
 
 const route = useRoute()
@@ -14,6 +15,7 @@ const { authState, ensureAuthSession, loginWithCredentials, logoutCurrentSession
 const { overview, ensureLoaded, startAutoRefresh, stopAutoRefresh } = useAccountOverviewData()
 const showLoginDialog = ref(false)
 const loginError = ref('')
+const dailyReviewNoticeDate = ref('')
 const loginForm = reactive({
   username: '',
   password: '',
@@ -28,21 +30,80 @@ const protectedNavItems = [
   { label: '交易', icon: 'pi pi-list', to: '/trades' },
   { label: '出入金', icon: 'pi pi-wallet', to: '/cash-flows' },
   { label: '股息', icon: 'pi pi-building-columns', to: '/dividends' },
+  { label: 'AI 决策', icon: 'pi pi-compass', to: '/agent/trade-decision' },
+  { label: 'AI 复盘', icon: 'pi pi-book', to: '/agent/trade-review' },
+  { label: '账户 Copilot', icon: 'pi pi-comments', to: '/agent/account-copilot' },
+  { label: '后台管理', icon: 'pi pi-cog', to: '/admin/ibkr' },
 ]
 
 const navItems = computed(() =>
   authState.authenticated ? [...baseNavItems, ...protectedNavItems] : baseNavItems,
 )
+const dailyReviewNoticeVisible = computed(() => Boolean(authState.authenticated && dailyReviewNoticeDate.value))
+
+function dailyReviewNoticeKey(reportDate: string): string {
+  const username = authState.username ?? 'anonymous'
+  return `ibkr-show.daily-review-notice.${username}.${reportDate}`
+}
+
+function hasSeenDailyReviewNotice(reportDate: string): boolean {
+  if (typeof window === 'undefined') return true
+  return window.localStorage.getItem(dailyReviewNoticeKey(reportDate)) === 'seen'
+}
+
+function markDailyReviewNoticeSeen(): void {
+  if (!dailyReviewNoticeDate.value || typeof window === 'undefined') return
+  window.localStorage.setItem(dailyReviewNoticeKey(dailyReviewNoticeDate.value), 'seen')
+  dailyReviewNoticeDate.value = ''
+}
+
+async function refreshDailyReviewNotice(): Promise<void> {
+  if (!authState.authenticated) {
+    dailyReviewNoticeDate.value = ''
+    return
+  }
+  try {
+    const latestDate = (await fetchDailyPositionReviewDates(1))[0] ?? ''
+    if (latestDate && !hasSeenDailyReviewNotice(latestDate)) {
+      dailyReviewNoticeDate.value = latestDate
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(dailyReviewNoticeKey(latestDate), 'seen')
+      }
+    } else {
+      dailyReviewNoticeDate.value = ''
+    }
+  } catch {
+    dailyReviewNoticeDate.value = ''
+  }
+}
 
 function isActive(path: string): boolean {
-  return route.path === path
+  if (route.path === path) {
+    return true
+  }
+  if (path.startsWith('/admin')) {
+    return route.path.startsWith('/admin')
+  }
+  if (path === '/agent/trade-decision') {
+    return route.path.startsWith('/agent/trade-decision')
+  }
+  if (path === '/agent/trade-review') {
+    return route.path.startsWith('/agent/trade-review')
+  }
+  if (path === '/agent/account-copilot') {
+    return route.path.startsWith('/agent/account-copilot')
+  }
+  return false
 }
 
 function isProtectedPath(path: string): boolean {
-  return path === '/trades' || path === '/cash-flows' || path === '/dividends'
+  return path === '/trades' || path === '/cash-flows' || path === '/dividends' || path.startsWith('/admin') || path.startsWith('/agent')
 }
 
 function navigate(path: string): void {
+  if (path === '/agent/trade-review') {
+    markDailyReviewNoticeSeen()
+  }
   void router.push(path)
 }
 
@@ -91,12 +152,20 @@ async function handleLogout(): Promise<void> {
 onMounted(() => {
   void ensureAuthSession()
   void ensureLoaded()
+  void refreshDailyReviewNotice()
   startAutoRefresh()
 })
 
 onUnmounted(() => {
   stopAutoRefresh()
 })
+
+watch(
+  () => authState.authenticated,
+  () => {
+    void refreshDailyReviewNotice()
+  },
+)
 </script>
 
 <template>
@@ -161,9 +230,16 @@ onUnmounted(() => {
           :label="item.label"
           :icon="item.icon"
           class="terminal-nav__button"
-          :class="{ 'is-active': isActive(item.to) }"
+          :class="{ 'is-active': isActive(item.to), 'has-daily-review-notice': item.to === '/agent/trade-review' && dailyReviewNoticeVisible }"
           @click="navigate(item.to)"
-        />
+        >
+          <span
+            v-if="item.to === '/agent/trade-review' && dailyReviewNoticeVisible"
+            class="daily-review-nav-notice"
+          >
+            请查收上个交易日的复盘数据
+          </span>
+        </Button>
       </nav>
     </div>
   </header>
@@ -281,6 +357,7 @@ onUnmounted(() => {
 }
 
 .terminal-nav__button {
+  position: relative;
   min-width: 240px;
   min-height: 64px;
   padding: 0 28px;
@@ -288,12 +365,35 @@ onUnmounted(() => {
   font-size: 1.4rem;
 }
 
-:deep(.terminal-nav__button .p-button-label) {
+.terminal-nav__button.has-daily-review-notice {
+  padding-bottom: 16px;
+}
+
+.daily-review-nav-notice {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  max-width: calc(100% - 24px);
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 180, 84, 0.16);
+  color: #ffd18a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+:deep(.terminal-nav__button .p-button-label),
+:deep(.terminal-nav__button [data-pc-section='label']) {
   font-size: 1.55rem;
   font-weight: 700;
 }
 
-:deep(.terminal-nav__button .p-button-icon) {
+:deep(.terminal-nav__button .p-button-icon),
+:deep(.terminal-nav__button [data-pc-section='icon']) {
   font-size: 1.45rem;
 }
 
@@ -354,6 +454,7 @@ onUnmounted(() => {
   .app-header__brand {
     flex-direction: column;
     align-items: stretch;
+    gap: var(--space-3);
   }
 
   .app-header__status {
@@ -364,14 +465,37 @@ onUnmounted(() => {
     justify-content: flex-start;
   }
 
-  .terminal-nav__button {
-    min-width: calc(50% - 9px);
-    min-height: 58px;
-    padding: 0 18px;
+  .app-header__nav {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    gap: 10px;
+    margin: 0 -18px;
+    padding: 0 18px 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
   }
 
-  :deep(.terminal-nav__button .p-button-label) {
-    font-size: 1.25rem;
+  .app-header__nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .terminal-nav__button {
+    min-width: auto;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 12px;
+  }
+
+  :deep(.terminal-nav__button .p-button-label),
+  :deep(.terminal-nav__button [data-pc-section='label']) {
+    font-size: 1rem;
+  }
+
+  :deep(.terminal-nav__button .p-button-icon),
+  :deep(.terminal-nav__button [data-pc-section='icon']) {
+    font-size: 1rem;
   }
 
   .app-header__metrics {

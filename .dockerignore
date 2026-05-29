@@ -1,0 +1,27 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+**/.venv
+**/venv
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+**/dist
+**/coverage
+**/*.log
+data
+logs
+public_repo_staging
+ibkr_show_backend/data
+ibkr_show_worker/data
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.sqlite
+*.db
+
+# Keep demo sample data
+!ibkr_show_worker/worker/fixtures/daily_sample.csv

@@ -15,6 +15,7 @@ from app.schemas.dividends import (
 )
 from app.schemas.positions import PositionItem, PositionListResponse, PositionSummaryResponse
 from app.schemas.trades import TradeItem, TradeListResponse, TradeSummaryResponse
+from app.schemas.trade_review import TradeReviewResult
 
 
 def test_account_overview_schema_instantiates() -> None:
@@ -157,3 +158,29 @@ def test_dividend_response_schema_instantiates() -> None:
     assert response.items[0].flow_type == "Dividends"
     assert summary.net_amount == 13.1
     assert summary.by_currency[0].withholding_tax_count == 1
+
+
+def test_trade_review_schema_allows_non_applicable_score() -> None:
+    review = TradeReviewResult(
+        id="review-1",
+        review_type="single_trade",
+        symbol="ORCL.US",
+        trade_ids=["trade-1"],
+        overall_score=72.5,
+        rating="good",
+        score_detail={
+            "exit_quality_score": {
+                "score": None,
+                "max_score": 15,
+                "reason": "尚未卖出，暂不评价。",
+                "applicable": False,
+            }
+        },
+        summary="仍持仓，退出质量暂不评价。",
+        created_at="2026-05-29T09:22:10.060120+00:00",
+        updated_at="2026-05-29T09:22:10.060120+00:00",
+    )
+
+    exit_score = review.score_detail["exit_quality_score"]
+    assert exit_score.score is None
+    assert exit_score.applicable is False

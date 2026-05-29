@@ -1,8 +1,11 @@
-fastapi
+fastapi>=0.110
 uvicorn[standard]
 python-dotenv
-pydantic
+pydantic>=2,<3
 elasticsearch>=8,<9
+longbridge
 redis
 pytest
 httpx
+requests
+langgraph>=0.2

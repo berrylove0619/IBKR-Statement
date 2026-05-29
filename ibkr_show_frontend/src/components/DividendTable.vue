@@ -69,7 +69,7 @@ function sortIndicator(
 </script>
 
 <template>
-  <div class="table-shell">
+  <div class="table-shell table-shell--desktop">
     <DataTable :value="items" class="terminal-datatable">
       <template #empty>
         <div class="empty-state">当前筛选条件下没有股息记录</div>
@@ -135,6 +135,37 @@ function sortIndicator(
         </template>
       </Column>
     </DataTable>
+  </div>
+
+  <div class="mobile-data-list">
+    <article v-for="item in items" :key="item.transaction_id || `${item.date_time}-${item.symbol}-${item.amount}`" class="mobile-data-card">
+      <div class="mobile-data-card__header">
+        <div class="mobile-data-card__title">
+          <strong>{{ item.symbol ?? '--' }}</strong>
+          <small>{{ item.description ?? '--' }}</small>
+        </div>
+        <Tag :value="flowTypeLabel(item.flow_type)" class="p-tag" :class="flowTypeClass(item.flow_type)" />
+      </div>
+
+      <div class="mobile-data-grid">
+        <div class="mobile-data-row">
+          <span>金额</span>
+          <strong :class="amountClass(item.amount)">{{ formatNumber(item.amount, 2) }}</strong>
+        </div>
+        <div class="mobile-data-row">
+          <span>币种</span>
+          <strong>{{ item.currency ?? '--' }}</strong>
+        </div>
+        <div class="mobile-data-row">
+          <span>到账时间</span>
+          <strong>{{ item.date_time ?? item.settle_date ?? '--' }}</strong>
+        </div>
+        <div class="mobile-data-row">
+          <span>除息日</span>
+          <strong>{{ item.ex_date ?? '--' }}</strong>
+        </div>
+      </div>
+    </article>
   </div>
 </template>
 

@@ -1,333 +1,253 @@
 # IBKR Show
 
-`IBKR Show` 是一个面向个人 IBKR 账户的可视化分析项目。
+IBKR 个人账户可视化与 AI 分析工具。把 IBKR Flex Query / 历史 CSV 中的账户、持仓、交易、现金流、股息解析到 Elasticsearch，通过 FastAPI 和 Vue 前端提供可视化查询、交易复盘和交易决策辅助。
 
-它做的事情很直接：
+- **IBKR 是个人账户数据唯一来源**（账户、持仓、交易、成本、盈亏、股息、出入金）
+- **LongBridge 只用于公开市场数据**（行情、K 线、新闻、公告、财报、估值），不调用交易/账户/下单接口
+- **LLM 是可选能力**，未配置时核心页面仍可运行
+- **默认提供 Demo 模式**，没有 IBKR 账号也能体验完整功能
 
-- 从 IBKR Flex Query 拉取 `MyDailyData`。注意：勾选所有指标
-- 解析历史快照和每日增量
-- 幂等写入 Elasticsearch
-- 通过 FastAPI 提供查询接口
-- 通过 Vue 前端展示账户权益、持仓、交易、出入金和股票详情
+## 功能概览
 
-这个仓库已经整理成“拉下代码后只需要补 IBKR 配置即可运行”的结构。默认前提是：
-
-- 你本机已经有一个可用的 Elasticsearch，地址默认是 `http://localhost:9200`
-- 你可以从 IBKR 导出历史快照 CSV，或者已经配置好 Flex Token 与 Daily Query ID
-
-业务上真正必须手动填写的核心配置只有：
-
-- `FLEX_TOKEN`
-- `FLEX_QUERY_ID_DAILY`
-
-历史数据则通过导出的 CSV 批量导入。
-
-## 项目能力
-
-当前项目支持：
-
-- 账户总览
-  - 总权益、现金、股票市值、已实现盈亏、未实现盈亏、总盈亏、TWR
-- 账户曲线
-  - 账户权益
-  - 净收益
-  - 净成本
-- 持仓明细
-  - 数量、持仓均价、市价、持仓市值、占比
-  - 日涨跌
-  - 已实现 / 未实现盈亏及百分比
-- 股票详情
-  - 历史价格 K 线
-  - 买点 / 卖点标记
-  - 每笔买卖数量
-- 交易记录
-  - 按日期、代码、方向筛选
-  - 表头排序
-  - 按币种展示成交净额
-- 出入金记录
-  - 按日期、币种、方向筛选
-  - 按币种统计累计入金、累计出金和净流入
-
-## 仓库结构
-
-- `ibkr_show_worker`
-  - 负责 IBKR Flex 拉取、CSV 解析、ETL、写入 Elasticsearch
-- `ibkr_show_backend`
-  - FastAPI 查询层
-- `ibkr_show_frontend`
-  - Vue 3 + Vite 前端
-- `ibkr_show_common`
-  - 预留的共享文档、常量、schema 与 prompts 目录
-
-## 数据链路
-
-```text
-IBKR Flex Query / 历史 CSV
-    -> worker 解析
-    -> Elasticsearch
-    -> backend API
-    -> frontend 页面
-```
-
-## 系统架构
-
-```mermaid
-flowchart LR
-    A["IBKR Flex Query / 历史 CSV"] --> B["ibkr_show_worker"]
-    B --> C["Elasticsearch"]
-    C --> D["ibkr_show_backend (FastAPI)"]
-    D --> E["ibkr_show_frontend (Vue 3 + Vite)"]
-
-    B --> C1["account_daily_snapshot"]
-    B --> C2["position_daily_snapshot"]
-    B --> C3["trade_records"]
-    B --> C4["cash_flow_records"]
-    B --> C5["symbol_price_history"]
-```
-
-## 页面预览
-
-![Dashboard Preview](docs/screenshots/dashboard-preview.svg)
-
-当前会写入 5 个业务索引：
-
-- `ibkr_account_daily_snapshot_v1`
-  - 账户级日快照
-- `ibkr_position_daily_snapshot_v1`
-  - 持仓级快照
-- `ibkr_trade_records_v1`
-  - 交易流水
-- `ibkr_cash_flow_records_v1`
-  - 出入金流水
-- `ibkr_symbol_price_history_v1`
-  - 标的历史价格序列，用于股票详情 K 线
-
-## 运行前准备
-
-建议环境：
-
-- Python `3.11+`
-- Node.js `18+`
-- npm `9+`
-- Elasticsearch `8.x`
-
-默认端口：
-
-- Elasticsearch: `9200`
-- Backend: `8000`
-- Frontend: `5173`
+- 账户总览 — 总权益、现金、市值、盈亏、TWR、权益曲线、盈亏日历
+- 持仓分析 — 数量、均价、市价、市值、占比、日涨跌、集中度、资产分布
+- 交易记录 — 按日期/代码/方向筛选、排序、分页、CSV 导出
+- 出入金 / 股息 — 按币种汇总、预扣税、净到账
+- 每日持仓复盘 — 自动生成 + SMTP 邮件推送
+- 交易复盘 Agent — 标的级 / 单笔交易复盘，100 分制
+- 交易决策 Agent — 加仓/持有/减仓/清仓建议 + 财报分析
+- LLM Provider 后台配置 — 支持 OpenAI-compatible
+- LongBridge OAuth 一键授权 — 自动注册 Client ID
+- Email SMTP 配置
+- 系统状态页 — `/admin/system` 聚合 10 个组件健康检查
 
 ## 快速开始
 
-### 1. 克隆仓库
-
 ```bash
-git clone <your-github-url> ibkr_show
+git clone <repo-url> ibkr_show
 cd ibkr_show
-```
-
-### 2. 安装依赖
-
-#### Worker
-
-```bash
-cd /path/to/ibkr_show/ibkr_show_worker
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-#### Backend
-
-```bash
-cd /path/to/ibkr_show/ibkr_show_backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-#### Frontend
-
-```bash
-cd /path/to/ibkr_show/ibkr_show_frontend
-npm install
-```
-
-### 3. 配置环境变量
-
-#### Worker
-
-```bash
-cd /path/to/ibkr_show/ibkr_show_worker
 cp .env.example .env
+docker compose up -d
 ```
 
-最少需要确认：
+首次启动会构建镜像（约 3-5 分钟）。启动后访问 `http://localhost:8080`，首次进入会引导创建管理员账号。
 
-```env
-FLEX_TOKEN=你的_ibkr_flex_token
-FLEX_QUERY_ID_DAILY=你的_daily_query_id
-ES_HOST=http://localhost:9200
-```
+默认 `DEMO_MODE=true`，worker-init 会自动导入脱敏样例数据（AAPL、MSFT 等），无需 IBKR 账号即可体验完整页面。
 
-其余参数默认值通常可以直接使用。
-
-#### Backend
+## 自动化验收
 
 ```bash
-cd /path/to/ibkr_show/ibkr_show_backend
-cp .env.example .env
+scripts/verify_docker.sh
 ```
 
-如果 Elasticsearch 就是本机默认地址，通常不需要改动；默认值已经对齐当前项目索引名。
-
-### 4. 初始化 Elasticsearch 索引
+自动验证：Docker Compose config / build / up、`/health`、Demo 数据导入、Bootstrap 初始化、登录态、`/api/admin/system/status`（10 个组件）、前端 HTML。失败时自动打印关键日志。
 
 ```bash
-cd /path/to/ibkr_show/ibkr_show_worker
-./.venv/bin/python -m worker.main init-es
-./.venv/bin/python -m worker.main es-health
+# 验收后自动清理容器和数据卷
+CLEANUP=1 scripts/verify_docker.sh
 ```
 
-### 5. 导入历史快照
+## Demo 模式
 
-如果你的历史文件都在一个目录里，例如：
-
-```text
-/Users/you/Downloads/历史快照
-```
-
-可以批量导入：
+- 默认 `DEMO_MODE=true`，样例数据是脱敏数据
+- 不需要 IBKR / LLM / LongBridge 也能体验
+- 接入真实 IBKR 前建议清理 volume：
 
 ```bash
-cd /path/to/ibkr_show/ibkr_show_worker
-find /Users/you/Downloads/历史快照 -name '*.csv' -print0 | while IFS= read -r -d '' file; do
-  echo "importing $file"
-  ./.venv/bin/python -m worker.main import-daily-file --file "$file"
-done
+docker compose down -v
+# 修改 .env: DEMO_MODE=false
+docker compose up -d
 ```
 
-如果只导入单个文件：
+## 后台配置入口
+
+业务配置全部在后台页面填写，**不需要在 .env 里填写**：
+
+| 配置项 | 后台路径 |
+|--------|----------|
+| IBKR Flex Token / Query ID | `/admin/ibkr` |
+| LLM Provider / API Key / Model | `/admin/llm` |
+| LongBridge OAuth | `/admin/longbridge-mcp` |
+| Email SMTP | `/admin/email` |
+| 系统状态总览 | `/admin/system` |
+
+普通用户不需要在 `.env` 里填写 IBKR Flex Token、LLM API Key、LongBridge Client ID、Email SMTP 密码等，全部通过后台页面配置。
+
+## LongBridge 说明
+
+- 普通用户只需进入 `/admin/longbridge-mcp`，点击"开始授权"
+- 系统会自动注册 OAuth Client ID，跳转到 LongBridge 授权页
+- 用户同意后，OpenAPI / SDK / MCP 复用同一套 OAuth token
+- LongBridge **只用于公开市场数据**（行情、K 线、基准 ETF、资讯、公告、财报、估值）
+- **不用于**账户、持仓、订单、成交、下单等私有数据
+
+## 数据持久化
+
+Docker Compose 使用三个 named volume：
+
+| Volume | 内容 |
+|--------|------|
+| `es-data` | Elasticsearch 数据 |
+| `redis-data` | Redis 缓存 |
+| `backend-data` | 配置文件（`data/config/` 下的 JSON） |
+
+`backend-data` 保存的配置文件：
+
+- `admin_auth.json` — 管理员账号
+- `ibkr_flex.json` — IBKR Flex 配置
+- `llm_providers.json` — LLM Provider 列表
+- `longbridge_openapi_oauth.json` — LongBridge OAuth
+- `email.json` — Email SMTP 配置
+
+> **注意**：这些文件可能包含 token 和 API Key，不要提交到 Git，备份时注意安全。
+
+## 常用 Docker 命令
 
 ```bash
-./.venv/bin/python -m worker.main import-daily-file --file /absolute/path/to/history.csv
+docker compose ps                        # 查看容器状态
+docker compose logs -f backend           # 查看后端日志
+docker compose logs -f worker-scheduler  # 查看 worker 日志
+docker compose restart backend           # 重启某个服务
+docker compose down                      # 停止所有服务
+docker compose down -v                   # 停止并删除数据卷
+docker compose build --no-cache && docker compose up -d  # 重新构建
 ```
 
-### 6. 启动后端
+## 开发者模式
 
-```bash
-cd /path/to/ibkr_show/ibkr_show_backend
-./.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
+如果你需要本地开发而不是使用 Docker：
 
-### 7. 启动前端
+<details>
+<summary>展开查看手动启动方式</summary>
 
-```bash
-cd /path/to/ibkr_show/ibkr_show_frontend
-npm run dev -- --host 127.0.0.1 --port 5173
-```
+### 环境要求
 
-### 8. 可选：启动每日增量调度
-
-如果你已经配置好了 `FLEX_TOKEN` 和 `FLEX_QUERY_ID_DAILY`，可以开启每日自动增量：
-
-```bash
-cd /path/to/ibkr_show/ibkr_show_worker
-./.venv/bin/python -m worker.main run-scheduler
-```
-
-当前默认调度规则：
-
-- 每天北京时间 `09:00`
-- 拉取一次 `MyDailyData`
-- 幂等写入 ES
-
-也可以手动执行一次：
-
-```bash
-./.venv/bin/python -m worker.main pull-daily-from-ibkr
-```
-
-## 启动后访问
-
-- 前端: [http://127.0.0.1:5173](http://127.0.0.1:5173)
-- 后端健康检查: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
-
-## 当前页面说明
-
-- `/`
-  - 总览页，展示账户摘要、权益曲线、关键指标
-- `/positions`
-  - 持仓页，展示持仓明细、集中度、行业和资金类别
-  - 点击持仓行可打开股票详情弹窗
-- `/trades`
-  - 交易页，展示交易筛选、汇总卡片、交易明细
-- `/cash-flows`
-  - 出入金页，展示出入金筛选、按币种汇总和明细表
-
-## 股票详情页的数据口径
-
-股票详情弹窗使用：
-
-- `ibkr_symbol_price_history_v1`
-  - 作为历史价格主数据源
-- `ibkr_trade_records_v1`
-  - 叠加买点 / 卖点和成交数量
-
-因此：
-
-- K 线来源于历史快照中的价格历史 section
-- 买卖点来自真实交易记录
-
-## 常用命令
-
-### Worker
-
-```bash
-./.venv/bin/python -m worker.main init-es
-./.venv/bin/python -m worker.main es-health
-./.venv/bin/python -m worker.main import-daily-file --file /absolute/path/to/file.csv
-./.venv/bin/python -m worker.main pull-daily-from-ibkr
-./.venv/bin/python -m worker.main run-scheduler
-```
+- Python 3.11+
+- Node.js 18+
+- Elasticsearch 8.x
 
 ### Backend
 
 ```bash
-./.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+cd ibkr_show_backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+### Worker
+
+```bash
+cd ibkr_show_worker
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+python -m worker.main init-es
+python -m worker.main es-health
 ```
 
 ### Frontend
 
 ```bash
+cd ibkr_show_frontend
+npm install
 npm run dev -- --host 127.0.0.1 --port 5173
-npm run build
 ```
+
+### 测试
+
+```bash
+# 后端
+pytest ibkr_show_backend/tests
+
+# Worker
+pytest ibkr_show_worker/tests
+
+# 前端
+cd ibkr_show_frontend && npm run test && npm run build
+```
+
+### 导入历史 CSV
+
+```bash
+# 单文件
+python -m worker.main import-daily-file --file /path/to/file.csv
+
+# 批量
+find /path/to/folder -name '*.csv' -print0 | while IFS= read -r -d '' f; do
+  python -m worker.main import-daily-file --file "$f"
+done
+```
+
+</details>
+
+## IBKR Flex Query 要求
+
+建议在 Flex Query 中尽量勾选完整指标，至少覆盖：`ACCT`、`EQUT`、`POST`、`TRNT`、`CTRN`、`SECU`、`FIFO`、`MYTD`、`NETP`、`PPPO`、`CNAV`、`CRTT`、`UNBC`。缺失 section 会导致对应页面数据不完整。
 
 ## 常见问题
 
-### 1. 为什么页面没有数据？
+### 页面没有数据
 
-先确认：
+先查看 `/admin/system` 系统状态页和 `docker compose logs worker-init --tail=100`，确认 ES 连接、Demo 数据导入是否正常。
 
-- Elasticsearch 已启动
-- 已执行 `init-es`
-- 已导入历史 CSV 或执行过 `pull-daily-from-ibkr`
-- Backend `.env` 中 `ES_*` 配置可访问当前 ES
+### 登录账号是什么
 
-### 2. 为什么股票详情没有完整 K 线？
+首次启动通过页面创建管理员账号，不是 `.env` 中的默认密码。`.env` 中的 `AUTH_USERNAME` / `AUTH_PASSWORD` 仅作为应急 fallback。
 
-股票详情依赖价格历史索引 `ibkr_symbol_price_history_v1`。如果只导入了极少量文件，或没有导入包含历史价格 section 的文件，K 线会不完整。
+### LongBridge 或 LLM 没配置能不能启动
 
-### 3. 为什么交易或出入金统计不能直接相加？
+可以。LongBridge 和 LLM 是可选能力。未配置时，账户、持仓、交易、现金流、股息等 IBKR 本地数据页面仍可运行。
 
-因为不同记录可能来自不同币种。当前页面已经按币种分开展示资金统计；不要把不同币种金额直接当成同一口径总额。
+### 如何重置管理员密码
 
-## 备注
+删除 backend-data 中的 `data/config/admin_auth.json`，重启后重新初始化：
 
-这个项目目前面向单账户、自用分析场景，重点是：
+```bash
+docker compose exec backend rm /app/ibkr_show_backend/data/config/admin_auth.json
+docker compose restart backend
+```
 
-- 账户数据 ETL 可追溯
-- 重复导入幂等
-- 页面口径尽量和 IBKR 数据源保持一致
-- 历史数据 + 每日增量可以无缝衔接
+### 如何关闭 Demo 模式
+
+```bash
+# 修改 .env: DEMO_MODE=false
+docker compose down -v
+docker compose up -d
+```
+
+### 如何导入真实历史 CSV
+
+通过后台 `/admin/ibkr` 页面上传，或：
+
+```bash
+docker cp your-file.csv ibkr_show-backend-1:/app/ibkr_show_backend/data/
+docker compose exec worker-scheduler python -m worker.main import-daily-file --file /app/ibkr_show_backend/data/your-file.csv
+```
+
+## 安全声明
+
+- 本项目**不是投资建议**，LLM 输出仅供研究参考
+- 使用者需自行承担投资风险
+- **不要公开部署**带真实账户数据的实例，至少放在内网 / VPN / 反向代理认证后
+- **不要提交** token、API Key、IBKR CSV、账户数据到 Git
+
+## 发布前检查
+
+```bash
+scripts/check_release_safety.sh   # 扫描敏感信息泄露
+scripts/verify_docker.sh          # Docker 全链路验收
+```
+
+## Roadmap
+
+- 配置加密存储
+- 更完善的多用户 / 权限模型
+- 更丰富的 Demo 数据
+- 更完整的 CI
+- 更好的可观测性
+
+## License
+
+[MIT](LICENSE)

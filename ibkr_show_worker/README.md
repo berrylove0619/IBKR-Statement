@@ -37,7 +37,7 @@ cp .env.example .env
 
 ```env
 FLEX_TOKEN=
-FLEX_QUERY_ID_DAILY=1419985
+FLEX_QUERY_ID_DAILY=
 ES_HOST=http://localhost:9200
 ```
 
@@ -99,7 +99,7 @@ done
 
 默认规则：
 
-- 每天北京时间 `09:00`
+- 每天北京时间 `12:30`
 - 拉取一次 `MyDailyData`
 - 幂等写入 ES
 

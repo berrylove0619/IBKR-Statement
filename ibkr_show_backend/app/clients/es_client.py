@@ -2,6 +2,7 @@ import logging
 
 from elasticsearch import Elasticsearch
 from elasticsearch import NotFoundError
+from elasticsearch import ConflictError
 from elasticsearch.exceptions import ConnectionError as ESConnectionError
 
 from app.core.config import Settings
@@ -45,6 +46,47 @@ class ElasticsearchClient:
             return self._client.search(index=index, body=body)
         except NotFoundError as exc:
             raise ESIndexNotFoundError(f"Elasticsearch index not found: {index}") from exc
+        except ESConnectionError as exc:
+            raise ESUnavailableError("Elasticsearch is not reachable.") from exc
+
+    def get(self, index: str, id: str) -> dict | None:
+        try:
+            return self._client.get(index=index, id=id)
+        except NotFoundError:
+            return None
+        except ESConnectionError as exc:
+            raise ESUnavailableError("Elasticsearch is not reachable.") from exc
+
+    def index_document(self, index: str, id: str, document: dict) -> dict:
+        try:
+            return self._client.index(index=index, id=id, document=document, refresh=True)
+        except ESConnectionError as exc:
+            raise ESUnavailableError("Elasticsearch is not reachable.") from exc
+
+    def create_index_if_missing(self, index: str, body: dict) -> None:
+        try:
+            if self._client.indices.exists(index=index):
+                return
+            self._client.indices.create(index=index, **body)
+        except ConflictError:
+            return
+        except ESConnectionError as exc:
+            raise ESUnavailableError("Elasticsearch is not reachable.") from exc
+
+    def update_by_query(self, index: str, body: dict) -> dict:
+        try:
+            return self._client.update_by_query(index=index, body=body, refresh=True)
+        except NotFoundError:
+            return {"updated": 0}
+        except ESConnectionError as exc:
+            raise ESUnavailableError("Elasticsearch is not reachable.") from exc
+
+    def count(self, index: str) -> int:
+        try:
+            result = self._client.count(index=index)
+            return result.get("count", 0)
+        except NotFoundError:
+            return 0
         except ESConnectionError as exc:
             raise ESUnavailableError("Elasticsearch is not reachable.") from exc
 

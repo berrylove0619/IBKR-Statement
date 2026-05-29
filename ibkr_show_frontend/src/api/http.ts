@@ -1,4 +1,4 @@
-const API_BASE_URL =
+export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
   (typeof window !== 'undefined'
     ? window.location.port === '5173'
@@ -44,7 +44,9 @@ function formatDetail(detail: unknown): string {
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers ?? undefined)
-  if (init.body !== undefined && !headers.has('Content-Type')) {
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
+  const isBlob = typeof Blob !== 'undefined' && init.body instanceof Blob
+  if (init.body !== undefined && !isFormData && !isBlob && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
 
@@ -58,6 +60,13 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   const payload = isJson ? await response.json() : await response.text()
 
   if (!response.ok) {
+    if (response.status === 502 || response.status === 503 || response.status === 504) {
+      throw new ApiError('请求超时，后端可能仍在继续执行，请稍后刷新或等待运行状态更新。', response.status)
+    }
+    const isHtml = typeof payload === 'string' && payload.trimStart().startsWith('<')
+    if (isHtml) {
+      throw new ApiError('服务网关返回异常，请稍后重试或刷新查看结果。', response.status)
+    }
     const detail =
       typeof payload === 'object' && payload !== null && 'detail' in payload
         ? formatDetail(payload.detail)
