@@ -52,6 +52,7 @@ ibkr_show_worker/data/
 # IDE
 .idea/
 .vscode/
+.claude/
 
 # Docker
 docker-compose.override.yml
