@@ -2,7 +2,6 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Tag from 'primevue/tag'
 
@@ -22,6 +21,7 @@ import {
   runEval,
   seedEvalCases,
 } from '@/api/adminHarness'
+import HarnessDetailDialog from '@/components/admin/HarnessDetailDialog.vue'
 import JsonBlock from '@/components/admin/JsonBlock.vue'
 import type {
   AgentReplaySnapshot,
@@ -602,70 +602,80 @@ watch(activeTab, () => {
       </div>
     </section>
 
-    <Dialog :visible="Boolean(selectedLlmCall)" modal header="LLM Call Detail" class="harness-dialog" @update:visible="closeLlmCallDialog">
-      <JsonBlock :value="selectedLlmCall" />
-    </Dialog>
+    <HarnessDetailDialog :visible="Boolean(selectedLlmCall)" header="LLM Call Detail" @update:visible="closeLlmCallDialog">
+      <template #default="{ registerBlock }">
+        <JsonBlock :ref="(el: any) => registerBlock(el)" title="LLM Call" :value="selectedLlmCall" collapsed />
+      </template>
+    </HarnessDetailDialog>
 
-    <Dialog :visible="Boolean(selectedRun)" modal header="Agent Run Detail" class="harness-dialog" @update:visible="closeRunDialog">
-      <div v-if="selectedRun" class="dialog-stack">
-        <div class="dialog-actions"><Button label="查看 Replay" icon="pi pi-history" severity="secondary" @click="openReplayByRun(selectedRun.run_id)" /></div>
-        <JsonBlock title="基本信息" :value="{ run_id: selectedRun.run_id, agent_name: selectedRun.agent_name, final_status: selectedRun.final_status, latency_ms: selectedRun.latency_ms }" />
-        <JsonBlock title="prompt_metadata" :value="selectedRun.prompt_metadata" />
-        <JsonBlock title="llm_calls" :value="selectedRun.llm_calls" />
-        <JsonBlock title="tool_calls" :value="selectedRun.tool_calls" />
-        <JsonBlock title="validation / fallback" :value="{ validation: selectedRun.validation, fallback: selectedRun.fallback, repair_attempts: selectedRun.repair_attempts }" />
-        <JsonBlock title="node_traces" :value="selectedRun.node_traces" collapsed />
-        <JsonBlock title="metadata" :value="selectedRun.metadata" collapsed />
-      </div>
-    </Dialog>
+    <HarnessDetailDialog :visible="Boolean(selectedRun)" header="Agent Run Detail" @update:visible="closeRunDialog">
+      <template #default="{ registerBlock }">
+        <template v-if="selectedRun">
+          <div class="dialog-actions"><Button label="查看 Replay" icon="pi pi-history" severity="secondary" @click="openReplayByRun(selectedRun.run_id)" /></div>
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="基本信息" :value="{ run_id: selectedRun.run_id, agent_name: selectedRun.agent_name, final_status: selectedRun.final_status, latency_ms: selectedRun.latency_ms }" />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="prompt_metadata" :value="selectedRun.prompt_metadata" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="llm_calls" :value="selectedRun.llm_calls" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="tool_calls" :value="selectedRun.tool_calls" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="validation / fallback" :value="{ validation: selectedRun.validation, fallback: selectedRun.fallback, repair_attempts: selectedRun.repair_attempts }" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="node_traces" :value="selectedRun.node_traces" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="metadata" :value="selectedRun.metadata" collapsed />
+        </template>
+      </template>
+    </HarnessDetailDialog>
 
-    <Dialog :visible="Boolean(selectedReplay)" modal header="Replay Snapshot" class="harness-dialog" @update:visible="closeReplayDialog">
-      <div v-if="selectedReplay" class="dialog-stack">
-        <div class="dialog-actions">
-          <Button label="导出 Replay" icon="pi pi-download" severity="secondary" @click="exportReplay" />
-          <Button label="创建 Eval Case" icon="pi pi-plus" severity="secondary" @click="createCaseFromSelectedReplay" />
-          <Button label="运行 Static Eval" icon="pi pi-play" class="p-button--accent" @click="runEvalForReplay" />
-        </div>
-        <JsonBlock title="request" :value="selectedReplay.request" />
-        <JsonBlock title="prompt_refs" :value="selectedReplay.prompt_refs" />
-        <JsonBlock title="model_config" :value="selectedReplay.model_config" />
-        <JsonBlock title="context_snapshot" :value="selectedReplay.context_snapshot" collapsed />
-        <JsonBlock title="tool_snapshots" :value="selectedReplay.tool_snapshots" />
-        <JsonBlock title="llm_snapshots" :value="selectedReplay.llm_snapshots" />
-        <JsonBlock title="final_output" :value="selectedReplay.final_output" />
-        <JsonBlock title="data_limitations / trace_ref" :value="{ data_limitations: selectedReplay.data_limitations, trace_ref: selectedReplay.trace_ref }" />
-        <JsonBlock v-if="exportPackage" title="export package" :value="exportPackage" />
-      </div>
-    </Dialog>
+    <HarnessDetailDialog :visible="Boolean(selectedReplay)" header="Replay Snapshot" @update:visible="closeReplayDialog">
+      <template #default="{ registerBlock }">
+        <template v-if="selectedReplay">
+          <div class="dialog-actions">
+            <Button label="导出 Replay" icon="pi pi-download" severity="secondary" @click="exportReplay" />
+            <Button label="创建 Eval Case" icon="pi pi-plus" severity="secondary" @click="createCaseFromSelectedReplay" />
+            <Button label="运行 Static Eval" icon="pi pi-play" class="p-button--accent" @click="runEvalForReplay" />
+          </div>
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="request" :value="selectedReplay.request" />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="prompt_refs" :value="selectedReplay.prompt_refs" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="model_config" :value="selectedReplay.model_config" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="context_snapshot" :value="selectedReplay.context_snapshot" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="tool_snapshots" :value="selectedReplay.tool_snapshots" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="llm_snapshots" :value="selectedReplay.llm_snapshots" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="final_output" :value="selectedReplay.final_output" />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="data_limitations / trace_ref" :value="{ data_limitations: selectedReplay.data_limitations, trace_ref: selectedReplay.trace_ref }" collapsed />
+          <JsonBlock v-if="exportPackage" :ref="(el: any) => registerBlock(el)" title="export package" :value="exportPackage" collapsed />
+        </template>
+      </template>
+    </HarnessDetailDialog>
 
-    <Dialog :visible="Boolean(selectedEvalCase)" modal header="Eval Case" class="harness-dialog" @update:visible="closeEvalCaseDialog">
-      <div v-if="selectedEvalCase" class="dialog-stack">
-        <div class="dialog-actions"><Button label="运行 Static Eval" icon="pi pi-play" class="p-button--accent" @click="runEvalForCase(selectedEvalCase?.case_id)" /></div>
-        <JsonBlock title="input" :value="selectedEvalCase.input" />
-        <JsonBlock title="mock_context" :value="selectedEvalCase.mock_context" collapsed />
-        <JsonBlock title="expected_behavior" :value="selectedEvalCase.expected_behavior" />
-        <JsonBlock title="expected_output_fields" :value="selectedEvalCase.expected_output_fields" />
-        <JsonBlock title="forbidden_behavior" :value="selectedEvalCase.forbidden_behavior" />
-        <JsonBlock title="scoring_rubric" :value="selectedEvalCase.scoring_rubric" />
-        <JsonBlock title="metadata" :value="selectedEvalCase.metadata" collapsed />
-      </div>
-    </Dialog>
+    <HarnessDetailDialog :visible="Boolean(selectedEvalCase)" header="Eval Case" @update:visible="closeEvalCaseDialog">
+      <template #default="{ registerBlock }">
+        <template v-if="selectedEvalCase">
+          <div class="dialog-actions"><Button label="运行 Static Eval" icon="pi pi-play" class="p-button--accent" @click="runEvalForCase(selectedEvalCase?.case_id)" /></div>
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="input" :value="selectedEvalCase.input" />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="mock_context" :value="selectedEvalCase.mock_context" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="expected_behavior" :value="selectedEvalCase.expected_behavior" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="expected_output_fields" :value="selectedEvalCase.expected_output_fields" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="forbidden_behavior" :value="selectedEvalCase.forbidden_behavior" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="scoring_rubric" :value="selectedEvalCase.scoring_rubric" collapsed />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="metadata" :value="selectedEvalCase.metadata" collapsed />
+        </template>
+      </template>
+    </HarnessDetailDialog>
 
-    <Dialog :visible="Boolean(selectedEvalRun)" modal header="Eval Run" class="harness-dialog" @update:visible="closeEvalRunDialog">
-      <div v-if="selectedEvalRun" class="dialog-stack">
-        <JsonBlock title="summary" :value="selectedEvalRun.summary" />
-        <JsonBlock title="config" :value="selectedEvalRun.config" />
-        <table class="harness-table">
-          <thead><tr><th>case_id</th><th>agent</th><th>status</th><th>score</th><th>replay</th><th>run</th><th>error</th></tr></thead>
-          <tbody>
-            <tr v-for="result in selectedEvalRun.results || []" :key="`${result.case_id}-${result.replay_id}`" @click="openChecks(result)">
-              <td><code>{{ result.case_id }}</code></td><td>{{ result.agent_name || '-' }}</td><td><Tag :value="result.status || '-'" :class="statusClass(result.status)" /></td><td>{{ result.score ?? 0 }}/{{ result.max_score ?? 0 }}</td><td>{{ result.replay_id || '-' }}</td><td>{{ result.run_id || '-' }}</td><td>{{ result.error_code || '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <JsonBlock v-if="selectedEvalChecks" title="checks" :value="selectedEvalChecks" />
-      </div>
-    </Dialog>
+    <HarnessDetailDialog :visible="Boolean(selectedEvalRun)" header="Eval Run" @update:visible="closeEvalRunDialog">
+      <template #default="{ registerBlock }">
+        <template v-if="selectedEvalRun">
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="summary" :value="selectedEvalRun.summary" />
+          <JsonBlock :ref="(el: any) => registerBlock(el)" title="config" :value="selectedEvalRun.config" collapsed />
+          <table class="harness-table">
+            <thead><tr><th>case_id</th><th>agent</th><th>status</th><th>score</th><th>replay</th><th>run</th><th>error</th></tr></thead>
+            <tbody>
+              <tr v-for="result in selectedEvalRun.results || []" :key="`${result.case_id}-${result.replay_id}`" @click="openChecks(result)">
+                <td><code>{{ result.case_id }}</code></td><td>{{ result.agent_name || '-' }}</td><td><Tag :value="result.status || '-'" :class="statusClass(result.status)" /></td><td>{{ result.score ?? 0 }}/{{ result.max_score ?? 0 }}</td><td>{{ result.replay_id || '-' }}</td><td>{{ result.run_id || '-' }}</td><td>{{ result.error_code || '-' }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <JsonBlock v-if="selectedEvalChecks" :ref="(el: any) => registerBlock(el)" title="checks" :value="selectedEvalChecks" />
+        </template>
+      </template>
+    </HarnessDetailDialog>
   </section>
 </template>
 
@@ -823,10 +833,6 @@ watch(activeTab, () => {
 code {
   color: var(--color-accent-strong);
   overflow-wrap: anywhere;
-}
-
-:deep(.harness-dialog) {
-  width: min(1120px, 94vw);
 }
 
 @media (max-width: 1100px) {
