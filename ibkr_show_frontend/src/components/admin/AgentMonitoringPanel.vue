@@ -260,6 +260,12 @@ async function runOneClickProbe(kind: ProbeKind): Promise<void> {
 }
 
 function ensureCharts(): void {
+  // Dispose stale instances whose DOM elements were destroyed by v-if
+  if (ibkrChart && !ibkrChartRef.value) { ibkrChart.dispose(); ibkrChart = null }
+  if (mcpChart && !mcpChartRef.value) { mcpChart.dispose(); mcpChart = null }
+  if (llmChart && !llmChartRef.value) { llmChart.dispose(); llmChart = null }
+  if (soChart && !soChartRef.value) { soChart.dispose(); soChart = null }
+
   if (!ibkrChart && ibkrChartRef.value) ibkrChart = echarts.init(ibkrChartRef.value, undefined, { renderer: 'canvas' })
   if (!mcpChart && mcpChartRef.value) mcpChart = echarts.init(mcpChartRef.value, undefined, { renderer: 'canvas' })
   if (!llmChart && llmChartRef.value) llmChart = echarts.init(llmChartRef.value, undefined, { renderer: 'canvas' })
