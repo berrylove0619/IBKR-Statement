@@ -1,85 +1,52 @@
 ---
 name: galaxy-buffett-daily-stock-analysis
-description: [TODO: Complete and informative explanation of what the skill does and when to use it. Include WHEN to use this skill - specific scenarios, file types, or tasks that trigger it.]
+description: Use when the user asks for a daily US stock morning briefing, major market or technology news, upcoming earnings, or portfolio-specific analysis and recommendations based on the user's IBKR holdings.
 ---
 
-# Galaxy Buffett Daily Stock Analysis
+# Galaxy Buffett 每日美股分析
 
-## Overview
+## 核心原则
 
-[TODO: 1-2 sentences explaining what this skill enables]
+只依据 IBKR-Statement 最新成功导入的实际持仓和可追溯英文证据，生成组合级中文晨报。先扫描全部持仓，再选择少量重点；没有新证据时明确维持原计划。
 
-## Structuring This Skill
+不得调用或要求调用任何其他投资 Skill。可使用正常网页与文件工具取得事实。不得猜测持仓、自动交易、保存券商凭证或承诺收益。
 
-[TODO: Choose the structure that best fits this skill's purpose. Common patterns:
+## 每次固定读取
 
-**1. Workflow-Based** (best for sequential processes)
-- Works well when there are clear step-by-step procedures
-- Example: DOCX skill with "Workflow Decision Tree" -> "Reading" -> "Creating" -> "Editing"
-- Structure: ## Overview -> ## Workflow Decision Tree -> ## Step 1 -> ## Step 2...
+开始分析前完整读取以下三份 reference：
 
-**2. Task-Based** (best for tool collections)
-- Works well when the skill offers different operations/capabilities
-- Example: PDF skill with "Quick Start" -> "Merge PDFs" -> "Split PDFs" -> "Extract Text"
-- Structure: ## Overview -> ## Quick Start -> ## Task Category 1 -> ## Task Category 2...
+1. [新闻证据规则](references/news-evidence.md)
+2. [持仓分析规则](references/portfolio-analysis.md)
+3. [晨报输出合同](references/morning-report-contract.md)
 
-**3. Reference/Guidelines** (best for standards or specifications)
-- Works well for brand guidelines, coding standards, or requirements
-- Example: Brand styling with "Brand Guidelines" -> "Colors" -> "Typography" -> "Features"
-- Structure: ## Overview -> ## Guidelines -> ## Specifications -> ## Usage...
+## 主流程
 
-**4. Capabilities-Based** (best for integrated systems)
-- Works well when the skill provides multiple interrelated features
-- Example: Product Management with "Core Capabilities" -> numbered capability list
-- Structure: ## Overview -> ## Core Capabilities -> ### 1. Feature -> ### 2. Feature...
+按以下顺序执行：
 
-Patterns can be mixed and matched as needed. Most skills combine patterns (e.g., start with task-based, add workflow for complex operations).
+1. **验证持仓快照**：定位 IBKR-Statement 最新一次成功导入，记录导入时间、持仓日期、账户币种和数据新鲜度。缺失、失败或过期时停止生成仓位动作，显著披露限制；不得用旧记忆、新闻中的仓位或推测补齐。
+2. **扫描全部持仓**：对每个实际持仓执行确定性相关性扫描；记录已扫描数量、总持仓数量、遗漏项及原因。先完成全覆盖，再挑选最多 6 个重点持仓。
+3. **执行新闻证据门槛**：只接受六类白名单来源，规范化域名、去重同源转载、赋予四种验证状态，并在冲突时降级。只有达到可验证门槛的事件才可支持仓位动作。
+4. **按条件加载专项 reference**：只读取被观察事实触发的文件：
+   - 持仓公司临近财报或刚发布财报：读取 `references/earnings-playbook.md`。
+   - 周度宏观复盘或出现异常宏观冲击：读取 `references/macro-risk.md`。
+   - 月度复盘或投资逻辑发生变化：读取 `references/long-term-quality.md`。
+   - AI、半导体、数据中心、光通信或关键供应链事件命中持仓：读取 `references/tech-supply-chain.md`。
+   - 未满足触发条件时不得预加载上述专项文件。
+5. **只做一次组合级综合**：统一评估直接、二阶、宏观共同因子、集中度和相关风险。只有持仓财报命中且确需深挖时，才允许再做一次财报专项分析；其他事件不得增加专项分析轮次。
+6. **生成 HTML 晨报**：严格采用晨报合同，以中文输出独立、可浏览的本地 HTML，并保留可点击英文证据链接、规范域名、验证状态、持仓数据时间、覆盖状态和风险说明。
 
-Delete this entire "Structuring This Skill" section when done - it's just guidance.]
+## 决策门槛
 
-## [TODO: Replace with the first main section based on chosen structure]
+- 重要事件进入仓位建议前，必须达到 `verified_primary_plus_independent` 或 `verified_two_independent`。
+- `primary_only_pending` 只可提示等待独立确认；`unverified_single_source` 只可进入观察区。
+- 单一来源、匿名爆料、传闻、短时价格波动或泛行业新闻不得独立触发加仓、减仓或清仓。
+- 只有“直接”或传导路径清晰的“二阶”事件可进入持仓建议；宏观共同因子进入组合风险，无实质关联只计入扫描覆盖。
+- 每项动作必须写明触发条件、反证条件、时间范围和主要风险。集中度再平衡必须明确标为组合风险动作，不得伪装成新闻触发动作。
+- 动作用“观察 / 持有 / 条件式加减仓 / 风险控制”表达。没有满足条件的新证据时使用“维持原计划”。所有交易均由用户确认并在 IBKR 自行执行。
 
-[TODO: Add content here. See examples in existing skills:
-- Code samples for technical skills
-- Decision trees for complex workflows
-- Concrete examples with realistic user requests
-- References to scripts/templates/references as needed]
+## 硬性上限
 
-## Resources (optional)
-
-Create only the resource directories this skill actually needs. Delete this section if no resources are required.
-
-### scripts/
-Executable code (Python/Bash/etc.) that can be run directly to perform specific operations.
-
-**Examples from other skills:**
-- PDF skill: `fill_fillable_fields.py`, `extract_form_field_info.py` - utilities for PDF manipulation
-- DOCX skill: `document.py`, `utilities.py` - Python modules for document processing
-
-**Appropriate for:** Python scripts, shell scripts, or any executable code that performs automation, data processing, or specific operations.
-
-**Note:** Scripts may be executed without loading into context, but can still be read by Codex for patching or environment adjustments.
-
-### references/
-Documentation and reference material intended to be loaded into context to inform Codex's process and thinking.
-
-**Examples from other skills:**
-- Product management: `communication.md`, `context_building.md` - detailed workflow guides
-- BigQuery: API reference documentation and query examples
-- Finance: Schema documentation, company policies
-
-**Appropriate for:** In-depth documentation, API references, database schemas, comprehensive guides, or any detailed information that Codex should reference while working.
-
-### assets/
-Files not intended to be loaded into context, but rather used within the output Codex produces.
-
-**Examples from other skills:**
-- Brand styling: PowerPoint template files (.pptx), logo files
-- Frontend builder: HTML/React boilerplate project directories
-- Typography: Font files (.ttf, .woff2)
-
-**Appropriate for:** Templates, boilerplate code, document templates, images, icons, fonts, or any files meant to be copied or used in the final output.
-
----
-
-**Not every skill requires all three types of resources.**
+- 重大市场事件最多 5 条。
+- 科技事件最多 4 条。
+- 展开重点持仓最多 6 个。
+- 超出上限或没有显著变化的项目合并为“无重大变化”，同时保留全持仓覆盖统计。
