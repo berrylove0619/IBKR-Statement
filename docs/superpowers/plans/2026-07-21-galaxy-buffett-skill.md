@@ -183,11 +183,11 @@ Run:
 
 ```bash
 git add docs/superpowers/specs/2026-07-21-galaxy-buffett-skill-design.md \
-  docs/superpowers/specs/2026-07-21-galaxy-buffett-skill-baseline.md \
-  docs/superpowers/plans/2026-07-21-galaxy-buffett-skill.md \
-  skills/galaxy-buffett-daily-stock-analysis
+  docs/superpowers/plans/2026-07-21-galaxy-buffett-skill.md
 git commit -m "feat: 创建 Galaxy Buffett 每日持仓分析技能"
 git push
 ```
+
+只暂存本轮实际新增的 design 和 plan 两份文档；baseline 与 Skill 已在前序任务提交，不在此重放暂存，避免误导。
 
 Expected: 提交成功；若 HTTPS 凭证仍不可用，明确报告 push 失败并保留本地提交。
