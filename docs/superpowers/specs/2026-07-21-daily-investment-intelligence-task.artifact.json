@@ -1,0 +1,161 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "每日美股与 IBKR 持仓智能晨报任务",
+    "description": "每天早上把重要美股与科技新闻、重大日程和 IBKR 实际持仓合并成一份可执行但不自动交易的中文晨报。",
+    "generatedAt": "2026-07-21T12:30:00+08:00",
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "layout": "full",
+        "body": "# 每日美股与 IBKR 持仓智能晨报任务"
+      },
+      {
+        "id": "executive_summary",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## Executive Summary｜任务概要\n\n- **每天香港时间 07:30 生成：** 汇总最近 24 小时美股与科技大事、上一交易日及盘后变化、未来 7 天财报日程；扫描全部 IBKR 持仓，详细分析最多 6 个重点标的并给出有条件的建议。\n- **真实新闻，节省 Token：** 只接受 SEC、公司 IR、Reuters、CNBC、MarketWatch 和 Nasdaq 的交叉验证证据；中国新闻网站与聚合摘要不计入证据。过滤、去重和持仓匹配由程序完成，正常日只做一次批量模型推理。"
+      },
+      {
+        "id": "token_call_chart_block",
+        "type": "chart",
+        "layout": "full",
+        "chartId": "token_call_chart"
+      },
+      {
+        "id": "details",
+        "type": "html",
+        "layout": "full",
+        "body": "<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#202124;background:transparent}details{border:1px solid #d9dde3;border-radius:12px;margin:6px 0;background:#fff}summary{cursor:pointer;font-size:16px;font-weight:650;padding:12px 16px;list-style-position:inside}section{padding:0 18px 16px}h2{font-size:17px;margin:20px 0 8px}h3{font-size:15px;margin:16px 0 8px}p,li{font-size:14px;line-height:1.65}ul,ol{padding-left:22px}code{overflow-wrap:anywhere}strong{font-weight:650}@media(prefers-color-scheme:dark){body{color:#f1f3f4}details{background:#242526;border-color:#474a50}}</style><details><summary>查看完整任务：结果、来源、技能、流程与 Token 预算</summary><section><h2>每天早上的最终结果</h2><p><strong>30 秒摘要：</strong>今日市场环境、最重要的 3 件事、对组合影响最大的 3 个持仓，以及维持、观察、条件式加仓或降低风险等行动重点。</p><ol><li>美股与科技圈大事。</li><li>未来 7 天财报、FOMC、CPI、就业、监管和产品发布日历。</li><li>IBKR 净值、现金、集中度、主要盈亏和数据新鲜度。</li><li>重点持仓的影响、信心、建议、行动触发条件和反证条件。</li><li>其他持仓扫描、待确认事件、数据限制和证据链接。</li></ol><h2>新闻来源与建议规则</h2><p>只接受 SEC、公司 IR、Reuters、CNBC、MarketWatch 和 Nasdaq。仓位动作必须有“一手来源加独立媒体”或“两个独立专业媒体”。单一来源或相互冲突的消息只能观察。新浪、腾讯、东方财富及其他中国新闻网站，以及 Yahoo、Google、Bing 和 LongBridge 聚合摘要，不能计作新闻证据。</p><p>建议同时考虑仓位权重、成本盈亏、集中度、影响期限、长期基本面和市场风险；单纯价格波动不能触发买卖建议。</p><h2>技能组合</h2><h3>每日基础层</h3><ul><li><strong><code>global-stock-data</code>：</strong>行情、技术指标、SEC 和专业英文新闻证据。</li><li><strong>IBKR 每日持仓复盘：</strong>读取真实持仓并扫描全部标的，只把重点标的送入模型。</li></ul><h3>定期刷新层</h3><ul><li><strong><code>us-market-sentiment</code>：</strong>每周刷新市场情绪，日常复用缓存。</li><li><strong><code>us-value-investing</code>：</strong>每月或基本面变化时更新长期质量。</li></ul><h3>事件触发层</h3><ul><li><strong><code>macro-liquidity</code>：</strong>每周或宏观异常时检查流动性、SOFR、MOVE 和日元套利风险。</li><li><strong><code>tech-earnings-deepdive</code>：</strong>重大财报时触发，默认每天最多深挖 1 家。</li><li><strong><code>ai-supply-chain-bottleneck-hunter</code>：</strong>重大 AI、光子或半导体供应链事件命中持仓时触发。</li></ul><h2>每日流程</h2><ol><li>读取 IBKR 持仓和市场数据。</li><li>抓取白名单 RSS、SEC 与公司 IR。</li><li>程序执行过滤、去重、ticker 匹配、事件合并和来源验证。</li><li>扫描全部持仓，按仓位、相关性和风险排序。</li><li>条件调用专业技能，再用一次批量 Prompt 分析最多 6 个重点持仓。</li><li>执行证据闸门，生成本地 HTML 并沿用现有通知链路。</li></ol><h2>Token 预算与第一阶段</h2><ul><li>市场新闻最多 5 条、科技新闻最多 5 条、每个重点持仓最多 2 个已验证事件。</li><li>每条只保留标题、时间、来源、URL 和约 120 个中文字的事实摘要。</li><li>正常日 1 次主调用；重大财报日最多增加 1 次深挖。</li><li>相同内容不重复读取；周度指标不每日刷新。</li><li>主 Prompt 目标约 8k–12k 输入 Token；晨报约 1,500–2,500 个中文字。</li></ul><p>第一阶段先做本地 HTML 试运行版，连续运行一周后调整送达时间、新闻数量和重点持仓上限。单个新闻源失败不阻止晨报；IBKR 数据失败时必须标记持仓分析不可用。不增加登录、付费新闻 API 或自动下单。</p></section></details>"
+      }
+    ],
+    "charts": [
+      {
+        "id": "token_call_chart",
+        "title": "各处理阶段的模型调用上限",
+        "subtitle": "正常日只有批量推理调用模型；财报深挖仅在命中条件时增加一次",
+        "showDescription": true,
+        "intent": "comparison",
+        "question": "每日任务的模型调用集中在哪些阶段？",
+        "rationale": "柱状图用于比较五个处理阶段的模型调用上限。",
+        "type": "bar",
+        "dataset": "token_call_budget",
+        "sourceId": "task_design_rules",
+        "encodings": {
+          "x": {
+            "field": "stage",
+            "type": "nominal",
+            "aggregate": "none",
+            "label": "处理阶段"
+          },
+          "y": {
+            "field": "max_model_calls",
+            "type": "quantitative",
+            "aggregate": "none",
+            "format": "number",
+            "label": "模型调用上限",
+            "unit": "次"
+          },
+          "tooltip": [
+            {
+              "field": "mode",
+              "type": "text",
+              "label": "执行方式"
+            }
+          ]
+        },
+        "xAxisTitle": "处理阶段",
+        "yAxisTitle": "单日模型调用上限（次）",
+        "valueFormat": "number",
+        "unit": "次",
+        "layout": "full",
+        "maxRows": 5,
+        "surface": {
+          "surface": "compact",
+          "compact": true,
+          "interactiveLegend": false,
+          "showControls": false,
+          "viewMode": "visualization"
+        }
+      }
+    ],
+    "sources": [
+      {
+        "id": "task_design_rules",
+        "label": "每日美股与 IBKR 持仓智能晨报任务设计规则",
+        "query": {
+          "engine": "PostgreSQL",
+          "sql": "SELECT * FROM (VALUES ('获取与缓存', 0, '程序处理'), ('过滤与验证', 0, '程序处理'), ('持仓扫描', 0, '程序处理'), ('批量推理', 1, '每日固定'), ('财报深挖', 1, '条件触发')) AS token_budget(stage, max_model_calls, mode);",
+          "description": "生成任务设计中五个处理阶段的模型调用上限。",
+          "language": "sql",
+          "filters": [
+            "正常交易日基础流程",
+            "财报深挖仅在触发条件满足时执行"
+          ],
+          "metric_definitions": [
+            "max_model_calls 是单个处理阶段每天允许的模型调用上限"
+          ],
+          "tables_used": []
+        }
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-07-21T12:30:00+08:00",
+    "status": "ready",
+    "datasets": {
+      "token_call_budget": [
+        {
+          "stage": "获取与缓存",
+          "max_model_calls": 0,
+          "mode": "程序处理"
+        },
+        {
+          "stage": "过滤与验证",
+          "max_model_calls": 0,
+          "mode": "程序处理"
+        },
+        {
+          "stage": "持仓扫描",
+          "max_model_calls": 0,
+          "mode": "程序处理"
+        },
+        {
+          "stage": "批量推理",
+          "max_model_calls": 1,
+          "mode": "每日固定"
+        },
+        {
+          "stage": "财报深挖",
+          "max_model_calls": 1,
+          "mode": "条件触发"
+        }
+      ]
+    },
+    "accessIssues": []
+  },
+  "sources": [
+    {
+      "id": "task_design_rules",
+      "label": "每日美股与 IBKR 持仓智能晨报任务设计规则",
+      "query": {
+        "engine": "PostgreSQL",
+        "sql": "SELECT * FROM (VALUES ('获取与缓存', 0, '程序处理'), ('过滤与验证', 0, '程序处理'), ('持仓扫描', 0, '程序处理'), ('批量推理', 1, '每日固定'), ('财报深挖', 1, '条件触发')) AS token_budget(stage, max_model_calls, mode);",
+        "description": "生成任务设计中五个处理阶段的模型调用上限。",
+        "language": "sql",
+        "filters": [
+          "正常交易日基础流程",
+          "财报深挖仅在触发条件满足时执行"
+        ],
+        "metric_definitions": [
+          "max_model_calls 是单个处理阶段每天允许的模型调用上限"
+        ],
+        "tables_used": []
+      }
+    }
+  ]
+}
