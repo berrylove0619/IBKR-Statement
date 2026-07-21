@@ -4,6 +4,7 @@
       "hits": [
         {
           "_source": {
+            "account_id": "ACCOUNT_A",
             "report_date": "2026-04-18",
             "currency": "USD",
             "ingested_at": "2026-04-19T01:02:03Z",
@@ -19,6 +20,7 @@
       "hits": [
         {
           "_source": {
+            "account_id": "ACCOUNT_A",
             "report_date": "2026-04-18",
             "currency": "USD",
             "asset_class": "STK",
@@ -30,13 +32,14 @@
             "average_cost_price": 175,
             "cost_basis_money": 17500,
             "percent_of_nav": 19,
-            "ingested_at": "2026-04-19T01:02:03Z",
+            "ingested_at": "2026-04-19T01:02:03.100000Z",
             "source_file_name": "daily_sample.csv",
             "source_query_type": "daily_snapshot"
           }
         },
         {
           "_source": {
+            "account_id": "ACCOUNT_A",
             "report_date": "2026-04-18",
             "currency": "USD",
             "asset_class": "STK",
@@ -48,13 +51,14 @@
             "average_cost_price": 395,
             "cost_basis_money": 19750,
             "percent_of_nav": 21,
-            "ingested_at": "2026-04-19T01:02:03Z",
+            "ingested_at": "2026-04-19T01:02:03.200000Z",
             "source_file_name": "daily_sample.csv",
             "source_query_type": "daily_snapshot"
           }
         },
         {
           "_source": {
+            "account_id": "ACCOUNT_A",
             "report_date": "2026-04-18",
             "currency": "USD",
             "asset_class": "STK",
@@ -62,7 +66,7 @@
             "description": "Closed Position",
             "quantity": 0,
             "position_value": 0,
-            "ingested_at": "2026-04-19T01:02:03Z",
+            "ingested_at": "2026-04-19T01:02:03.300000Z",
             "source_file_name": "daily_sample.csv",
             "source_query_type": "daily_snapshot"
           }

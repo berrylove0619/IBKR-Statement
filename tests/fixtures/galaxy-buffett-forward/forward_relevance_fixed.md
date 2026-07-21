@@ -30,7 +30,7 @@
   <header>
     <h1>持倉晨報草案</h1>
     <p><span class="badge">unknown｜持倉新鮮度未知</span></p>
-    <p class="warn">未找到最新成功的 IBKR 匯入快照；AAPL、MSFT、BRK.B 與短債 ETF 僅為用戶提供的臨時範圍。候選新聞未附正文或合格英文來源連結，不能支持交易動作。</p>
+    <p class="warn">未找到最新可用且可證明同批的 IBKR 快照；AAPL、MSFT、BRK.B 與短債 ETF 僅為用戶提供的臨時範圍。候選新聞未附正文或合格英文來源連結，不能支持交易動作。</p>
   </header>
 
   <section>
@@ -41,7 +41,7 @@
   <section>
     <h2>2. 數據與覆蓋</h2>
     <table>
-      <tr><th>最新成功匯入時間</th><td>未提供／未驗證</td></tr>
+      <tr><th>文檔批次時間</th><td>未提供／未驗證</td></tr>
       <tr><th>持倉截至時間／數據年齡</th><td>未提供／新鮮度未知</td></tr>
       <tr><th>帳戶幣種／源文件</th><td>未提供</td></tr>
       <tr><th>正式覆蓋</th><td>未驗證（不可填寫 <code>scanned_holdings / total_holdings</code>）</td></tr>

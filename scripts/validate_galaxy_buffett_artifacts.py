@@ -162,7 +162,10 @@ def validate_skill_contract(skill_root: Path) -> None:
 
     news_text = (skill_root / "references" / "news-evidence.md").read_text(encoding="utf-8")
     required_news_text = [
-        "默认时间窗：最近 36 小时",
+        "时间窗起点优先使用上一份成功生成晨报所记录的新闻截止时间",
+        "正常连续交易日回看 36 小时",
+        "星期一或 NYSE 休市后的首份晨报可回看最多 96 小时",
+        "两次晨报间隔超过 96 小时",
         "候选元数据最多 120 条",
         "去重后事件簇最多 40 个",
         "深读事件簇最多 12 个",
@@ -192,8 +195,11 @@ def validate_ibkr_reader(repo_root: Path, skill_root: Path) -> None:
     payload = json.loads(completed.stdout)
     assert payload["status"] == "ready"
     assert payload["snapshot"]["holdings_as_of"] == "2026-04-18"
-    assert payload["snapshot"]["imported_at"] == "2026-04-19T01:02:03Z"
+    assert payload["snapshot"]["document_batch_time"] == "2026-04-19T01:02:03.300000+00:00"
     assert payload["snapshot"]["base_currency"] == "USD"
+    assert payload["snapshot"]["source_identifier_present"] is True
+    assert payload["selection"]["import_success_persisted"] is False
+    assert "success_status" not in payload["selection"]
     assert payload["total_holdings"] == 2
     assert [item["symbol"] for item in payload["holdings"]] == ["MSFT", "AAPL"]
     assert set(payload["holdings"][0]) == {
@@ -208,7 +214,14 @@ def validate_ibkr_reader(repo_root: Path, skill_root: Path) -> None:
         "portfolio_weight",
         "currency",
     }
-    forbidden = ["account_id", "source_file_name", "flex_token", "password", "ACCOUNT_REDACTED"]
+    forbidden = [
+        "account_id",
+        "source_file_name",
+        "source_file_fingerprint",
+        "flex_token",
+        "password",
+        "ACCOUNT_A",
+    ]
     output_lower = completed.stdout.lower()
     leaked = [item for item in forbidden if item.lower() in output_lower]
     if leaked:

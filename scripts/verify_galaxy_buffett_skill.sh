@@ -17,17 +17,31 @@ if [ ! -d "$skill_root" ]; then
   exit 2
 fi
 
-verify_temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/galaxy-buffett-verify.XXXXXX")
+verify_temp_parent=${TMPDIR:-/tmp}
+verify_temp_parent=${verify_temp_parent%/}
+verify_temp_dir=$(mktemp -d "$verify_temp_parent/galaxy-buffett-verify.XXXXXX")
 cleanup() {
-  rm -rf -- "$verify_temp_dir"
+  case "$verify_temp_dir" in
+    "$verify_temp_parent"/galaxy-buffett-verify.*)
+      if [ -d "$verify_temp_dir" ]; then
+        find "$verify_temp_dir" -depth -delete
+      fi
+      ;;
+    *)
+      echo "refusing unsafe temporary cleanup path" >&2
+      return 1
+      ;;
+  esac
 }
 trap cleanup EXIT HUP INT TERM
 
 python3 -m venv "$verify_temp_dir/venv"
-"$verify_temp_dir/venv/bin/python" -m pip install --quiet --disable-pip-version-check "PyYAML==6.0.2"
-"$verify_temp_dir/venv/bin/python" "$quick_validate" "$skill_root"
+verify_python="$verify_temp_dir/venv/bin/python"
+"$verify_python" -m pip install --quiet --disable-pip-version-check \
+  "PyYAML==6.0.2" -r "$repo_root/ibkr_show_worker/requirements.txt"
+"$verify_python" "$quick_validate" "$skill_root"
 
-"$verify_temp_dir/venv/bin/python" - "$skill_root/agents/openai.yaml" <<'PY'
+"$verify_python" - "$skill_root/agents/openai.yaml" <<'PY'
 from pathlib import Path
 import sys
 import yaml
@@ -64,13 +78,23 @@ if [ "$skill_lines" -ge 500 ]; then
   exit 1
 fi
 
-PYTHONPYCACHEPREFIX="$verify_temp_dir/pycache" python3 -m py_compile \
+PYTHONPYCACHEPREFIX="$verify_temp_dir/pycache" "$verify_python" -m py_compile \
   "$skill_root/scripts/read_ibkr_snapshot.py" \
   "$repo_root/scripts/validate_galaxy_buffett_artifacts.py"
-python3 "$repo_root/scripts/validate_galaxy_buffett_artifacts.py" skill "$skill_root" "$repo_root"
+"$verify_python" "$repo_root/scripts/validate_galaxy_buffett_artifacts.py" skill "$skill_root" "$repo_root"
+
+(
+  cd "$repo_root"
+  GALAXY_IBKR_READER_PATH="$skill_root/scripts/read_ibkr_snapshot.py" \
+    "$verify_python" -m unittest -v tests.test_galaxy_ibkr_reader
+  PYTHONPATH="$repo_root/ibkr_show_worker" "$verify_python" -m pytest -q \
+    ibkr_show_worker/tests/test_flex_csv_parser.py \
+    ibkr_show_worker/tests/test_transformers.py \
+    ibkr_show_worker/tests/test_import_daily_snapshot.py
+)
 
 if [ "$skill_root" = "$project_skill" ]; then
-  python3 "$repo_root/scripts/validate_galaxy_buffett_artifacts.py" all "$repo_root"
+  "$verify_python" "$repo_root/scripts/validate_galaxy_buffett_artifacts.py" all "$repo_root"
   git -C "$repo_root" diff --check
 fi
 
