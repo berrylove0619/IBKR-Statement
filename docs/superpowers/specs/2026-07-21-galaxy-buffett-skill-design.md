@@ -35,7 +35,8 @@ Skill 不再串行调用 `global-stock-data`、财报、价值投资、市场情
 skills/galaxy-buffett-daily-stock-analysis/
 ├── SKILL.md
 ├── agents/openai.yaml
-└── references/
+├── references/
+    ├── ibkr-input-contract.md
     ├── news-evidence.md
     ├── portfolio-analysis.md
     ├── earnings-playbook.md
@@ -43,9 +44,17 @@ skills/galaxy-buffett-daily-stock-analysis/
     ├── long-term-quality.md
     ├── tech-supply-chain.md
     └── morning-report-contract.md
+└── scripts/
+    └── read_ibkr_snapshot.py
 ```
 
 `SKILL.md` 只保留触发条件、主流程、硬性门槛和 reference 路由。详细分析方法按需读取，避免每天把所有框架都装入上下文。
+
+## 确定性 IBKR 输入
+
+每次运行固定读取 `ibkr-input-contract.md` 并执行标准库只读脚本 `read_ibkr_snapshot.py`。脚本从当前目录／父目录或其直接子目录 `IBKR-Statement` 发现项目根，读取现有账户与持仓 Elasticsearch 索引，并只输出脱敏字段。
+
+真实索引 schema 没有独立持久化的 import status。设计不虚构成功表或成功字段：按 `report_date desc, ingested_at desc` 选最新账户文档，再连接同一 `report_date + source_query_type + source_file_name` 的持仓文档。连接失败、零非零持仓或数据源不可用时，不回退旧日期，正式覆盖保持未验证并停止仓位动作。`ingested_at` 仅作为文档批次时间，不冒充独立审计完成时间。
 
 ## 数据与证据边界
 
@@ -72,6 +81,7 @@ SEC 与公司 IR 是一手来源；其余为独立英文专业媒体。搜索引
 
 每天固定读取：
 
+- `ibkr-input-contract.md`
 - `news-evidence.md`
 - `portfolio-analysis.md`
 - `morning-report-contract.md`
@@ -83,7 +93,7 @@ SEC 与公司 IR 是一手来源；其余为独立英文专业媒体。搜索引
 - 月度复盘或投资逻辑发生变化：`long-term-quality.md`
 - AI、半导体、数据中心、光通信或关键供应链命中持仓：`tech-supply-chain.md`
 
-每日先用确定性规则做全持仓扫描，再选择最多 6 个需要展开的持仓。最终只做一次组合级综合分析；只有财报命中且确实需要深挖时，允许增加一次专项分析。报告默认限制为重大市场事件 5 条、科技事件 4 条、重点持仓 6 个，其余合并为“无重大变化”。
+每日先用确定性规则做全持仓扫描，再选择最多 6 个需要展开的持仓。新闻输入先扫描最近 36 小时内最多 120 条候选元数据，去重为最多 40 个事件簇，只深读最多 12 个事件簇；单事件默认最多 3 源，达到双源门槛即停止，冲突时最多额外 2 源。实际持仓直接事件与系统性事件优先进入元数据扫描；优先队列本身溢出时披露并取消完整覆盖声明。最终只做一次组合级综合分析；只有财报命中且确实需要深挖时，允许增加一次专项分析。报告限制为重大市场事件 5 条、科技事件 4 条、重点持仓 6 个，其余合并为“无重大变化”。
 
 ## 持仓建议纪律
 
@@ -105,3 +115,10 @@ SEC 与公司 IR 是一手来源；其余为独立英文专业媒体。搜索引
 `/Users/galaxyimac/.codex/skills/galaxy-buffett-daily-stock-analysis`
 
 以后需求变化先修改项目内版本，通过基线、结构校验和压力测试后再同步安装，避免全局安装版本与项目版本悄悄分叉。
+
+## 最终 remediation 与验证
+
+- tracked fixtures 保存 breadth、conflict、relevance failed 与 fresh fixed 原始 prompt/output；绝对路径已脱敏。
+- `scripts/validate_galaxy_buffett_artifacts.py` 不调用 LLM，验证失败 fixture 被拒绝、fixed HTML 合同、IBKR 字段映射、非零过滤和失败分支。
+- `scripts/verify_galaxy_buffett_skill.sh` 在临时 venv 安装固定版本 PyYAML，运行官方 `quick_validate.py`，独立解析 `openai.yaml`，区分 `rg` 无匹配 exit 1 与工具错误 exit >1，再运行全部结构／fixture 断言。
+- 安装前必须证明现有全局副本等于修改前项目版本；同步后 `diff -ru` 必须 exit 0，并对安装副本重跑同一验证入口。

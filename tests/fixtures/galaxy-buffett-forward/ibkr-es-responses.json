@@ -1,0 +1,73 @@
+{
+  "account_search": {
+    "hits": {
+      "hits": [
+        {
+          "_source": {
+            "report_date": "2026-04-18",
+            "currency": "USD",
+            "ingested_at": "2026-04-19T01:02:03Z",
+            "source_file_name": "daily_sample.csv",
+            "source_query_type": "daily_snapshot"
+          }
+        }
+      ]
+    }
+  },
+  "position_search": {
+    "hits": {
+      "hits": [
+        {
+          "_source": {
+            "report_date": "2026-04-18",
+            "currency": "USD",
+            "asset_class": "STK",
+            "symbol": "AAPL",
+            "description": "Apple Inc.",
+            "quantity": 100,
+            "mark_price": 190,
+            "position_value": 19000,
+            "average_cost_price": 175,
+            "cost_basis_money": 17500,
+            "percent_of_nav": 19,
+            "ingested_at": "2026-04-19T01:02:03Z",
+            "source_file_name": "daily_sample.csv",
+            "source_query_type": "daily_snapshot"
+          }
+        },
+        {
+          "_source": {
+            "report_date": "2026-04-18",
+            "currency": "USD",
+            "asset_class": "STK",
+            "symbol": "MSFT",
+            "description": "Microsoft Corp.",
+            "quantity": 50,
+            "mark_price": 420,
+            "position_value": 21000,
+            "average_cost_price": 395,
+            "cost_basis_money": 19750,
+            "percent_of_nav": 21,
+            "ingested_at": "2026-04-19T01:02:03Z",
+            "source_file_name": "daily_sample.csv",
+            "source_query_type": "daily_snapshot"
+          }
+        },
+        {
+          "_source": {
+            "report_date": "2026-04-18",
+            "currency": "USD",
+            "asset_class": "STK",
+            "symbol": "ZERO",
+            "description": "Closed Position",
+            "quantity": 0,
+            "position_value": 0,
+            "ingested_at": "2026-04-19T01:02:03Z",
+            "source_file_name": "daily_sample.csv",
+            "source_query_type": "daily_snapshot"
+          }
+        }
+      ]
+    }
+  }
+}

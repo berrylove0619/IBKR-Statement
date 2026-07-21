@@ -1,6 +1,6 @@
 ---
 name: galaxy-buffett-daily-stock-analysis
-description: Use when the user asks for a daily US stock morning briefing, major market or technology news, upcoming earnings, or portfolio-specific analysis and recommendations based on the user's IBKR holdings.
+description: Use when the user asks for a daily US stock morning briefing or portfolio-specific analysis of major market, technology, or earnings events based on the user's IBKR holdings.
 ---
 
 # Galaxy Buffett 每日美股分析
@@ -15,17 +15,18 @@ description: Use when the user asks for a daily US stock morning briefing, major
 
 ## 每次固定读取
 
-开始分析前完整读取以下三份 reference：
+开始分析前完整读取以下四份 reference：
 
-1. [新闻证据规则](references/news-evidence.md)
-2. [持仓分析规则](references/portfolio-analysis.md)
-3. [晨报输出合同](references/morning-report-contract.md)
+1. [IBKR 持仓输入合同](references/ibkr-input-contract.md)
+2. [新闻证据规则](references/news-evidence.md)
+3. [持仓分析规则](references/portfolio-analysis.md)
+4. [晨报输出合同](references/morning-report-contract.md)
 
 ## 主流程
 
 按以下顺序执行：
 
-1. **验证持仓快照**：定位 IBKR-Statement 最新一次成功导入，记录导入时间、持仓日期、账户币种和数据新鲜度。缺失、失败或过期时停止生成仓位动作，显著披露限制；不得用旧记忆、新闻中的仓位或推测补齐。缺少成功导入时，把题设或用户列出的证券标为“用户提供的临时范围”，正式覆盖标为“未验证”。
+1. **读取并验证持仓快照**：按 IBKR 输入合同执行 `scripts/read_ibkr_snapshot.py`。只在 exit 0 且 `status=ready` 时使用其脱敏 JSON，记录导入时间、持仓日期、账户币种和数据新鲜度。任何其他状态停止生成仓位动作，显著披露限制；不得用旧记忆、新闻中的仓位或推测补齐。此时把题设或用户列出的证券标为“用户提供的临时范围”，正式覆盖标为“未验证”。
 2. **扫描全部持仓**：只对成功导入快照中的每个实际持仓执行确定性相关性扫描；记录已扫描数量、总持仓数量、遗漏项及原因。先完成全覆盖，再挑选最多 6 个重点持仓。临时范围不得写入正式 `scanned_holdings / total_holdings`，也不得声称“全持仓覆盖”。
 3. **执行新闻证据门槛**：只接受六类白名单来源，规范化域名、去重同源转载、赋予四种验证状态，并在冲突时降级。只有达到可验证门槛的事件才可支持仓位动作。
 4. **按条件加载专项 reference**：只读取被观察事实触发的文件：

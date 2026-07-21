@@ -84,6 +84,27 @@
 
 证据来源：三个新的独立 Agent 仅加载项目 Skill 及其路由参考资料后，按上述三个场景重跑；修复后另以新上下文重跑场景 C。测试 Agent 未浏览网页、未修改项目文件。以下仅记录回答实际展示的行为；未触发的规则记为“不适用／未展示”，不据此推断已经执行。
 
+### 可审计测试证据
+
+原始 scratch prompt/output 已脱敏并迁移为 tracked fixtures，不再只依赖本页自述：
+
+- [`forward_breadth.md`](../../../tests/fixtures/galaxy-buffett-forward/forward_breadth.md)
+- [`forward_conflict.md`](../../../tests/fixtures/galaxy-buffett-forward/forward_conflict.md)
+- [`forward_relevance_failed.md`](../../../tests/fixtures/galaxy-buffett-forward/forward_relevance_failed.md)
+- [`forward_relevance_fixed.md`](../../../tests/fixtures/galaxy-buffett-forward/forward_relevance_fixed.md)
+
+失败→修复→fresh rerun 链由标准库校验器重放。它检查 HTML 完整闭合、八章节、实际 5/4/6 计数、正式覆盖未验证与临时范围分离、`evidence_gap` 以及每张持仓卡的完整字段；同时要求失败 fixture 确实被拒绝：
+
+```bash
+python3 scripts/validate_galaxy_buffett_artifacts.py report \
+  tests/fixtures/galaxy-buffett-forward/forward_relevance_failed.md --expect invalid
+python3 scripts/validate_galaxy_buffett_artifacts.py report \
+  tests/fixtures/galaxy-buffett-forward/forward_relevance_fixed.md --expect valid
+python3 scripts/validate_galaxy_buffett_artifacts.py all .
+```
+
+完整 Skill 验证入口为 `scripts/verify_galaxy_buffett_skill.sh`。fixtures 位于项目测试目录，不被 SKILL 固定读取，也不会装入日常运行上下文。
+
 ### 场景 A：25 个持仓与 100 条候选新闻
 
 测试记录：`forward_breadth`（2026-07-21）
