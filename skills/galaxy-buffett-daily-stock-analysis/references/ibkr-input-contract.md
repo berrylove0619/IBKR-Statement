@@ -1,62 +1,63 @@
 # IBKR 持仓输入合同
 
-## 唯一读取入口
+## 唯一正式来源
 
-每次晨报先执行 `scripts/read_ibkr_snapshot.py`。它只读本机 loopback Elasticsearch，输出脱敏 JSON；不得改用新闻、历史回答、用户口述或猜测补齐正式持仓。
+只使用当前会话中已授权的 `Interactive Brokers (IBKR)` 插件取得正式账户数据。按工具能力与说明选择接口，不依赖可能变化的内部哈希工具名。
 
-仓库根目录按以下顺序发现：显式 `--repo-root`；当前目录及父目录；这些目录的直接子目录 `IBKR-Statement`。候选目录必须同时包含 `ibkr_show_backend/` 和 `ibkr_show_worker/`，否则返回 `source_unavailable`。
+不得回退 Elasticsearch。不得读取 Flex CSV、本地缓存、历史晨报、记忆或用户口述来补齐正式持仓。用户列出的证券只能作为“用户提供的临时范围”，必须与插件正式持仓分开。
 
-```bash
-python3 IBKR-Statement/skills/galaxy-buffett-daily-stock-analysis/scripts/read_ibkr_snapshot.py
-```
+## 平衡模式固定调用
 
-若索引含多个账户，必须用 `--account-id` 或既有 `IBKR_ACCOUNT_ID` 环境变量显式选择。没有 selector 且账户候选不唯一时返回 `incomplete`。selector 值只用于 Elasticsearch 精确过滤，绝不输出或写入日志。
+每次晨报按以下顺序执行：
 
-脚本可安全读取既有 `ES_USERNAME`、`ES_PASSWORD` 和 `ES_VERIFY_CERTS`。用户名和密码必须同时存在；凭证不得出现在 URL、输出或错误信息中。即使配置认证，`ES_HOST` 仍只允许 `localhost`、`127.0.0.1` 或 `::1` 的 HTTP(S)，拒绝远端主机。
+1. 调用插件的“全部未平仓持仓”只读工具一次。
+2. 持仓调用成功后，调用“账户财务指标”和“分币种余额”只读工具，每项一次。
+3. 在同一次晨报中复用三项结果，不按证券、新闻或章节重复读取账户。
+4. 只有新闻初筛命中重点持仓且现有返回值不足以判断影响时，才条件调用额外市场数据；最多覆盖最终展开的 6 个重点持仓。
 
-## 已验证的真实数据链与成功语义
+不读取成交、活动订单、观察列表或历史收益，除非用户在当次任务明确要求对应的只读数据。不得创建交易指令、不得提交订单、不得修改观察列表，也不得调用插件中的其他写工具。
 
-- 导入链：Flex CSV → `worker.parsers.transformers` → `worker.jobs.import_daily_snapshot` → Elasticsearch bulk upsert。
-- 账户索引：`ibkr_account_daily_snapshot_v1`。
-- 持仓索引：`ibkr_position_daily_snapshot_v1`。
-- 后端现有服务读取相同索引；本脚本直接只读索引，是取得 `ingested_at` 且不修改公共 API／schema 的最小入口。
+只对明确的临时网络或服务错误重试一次。认证、权限或账户选择错误直接进入降级分支，不重复消耗调用。
 
-当前 schema **没有持久化的 import success 状态或独立导入日志**。禁止使用“最新成功导入”描述数据，也不得伪造 `status=success` 过滤。正式分析只能使用“最新可用且可证明同批的快照”；输出的 `document_batch_time` 是文档批次时间，不是导入成功审计时间。
+## 三项工具能力
 
-## 严格连接与同批证明
-
-账户候选按 `report_date desc, ingested_at desc` 排序。选定候选后，以下四个连接键必须全部为非空字符串：
-
-`account_id + report_date + source_query_type + source_file_name`
-
-任一缺失即返回 `incomplete`，绝不减少 position query 的过滤条件。position query 必须同时包含四个精确 `term` filters；每个返回文档还要逐项后验验证四键完全相等，错账户、错日期、错 query type 或错文件均返回 `incomplete`。
-
-真实 transformer 先生成账户文档，再在同一次内存转换中逐个生成持仓文档，并分别调用 `utc_now_iso()`。因此同批证明还要求账户与全部持仓均有可解析、带时区的 `ingested_at`，且每个持仓时间不得早于账户时间，也不得晚于账户时间超过 5 分钟。这样可拒绝“新账户文档已写入、持仓 bulk 尚未完成而旧持仓仍残留”的 partial import。只靠相同日期或文件名、时间缺失／倒序／跨度过大都不能证明同批，必须返回 `incomplete`，不得生成正式覆盖或仓位动作。
-
-账户或持仓候选超过 reader 上限而被截断时同样返回 `incomplete`。不存在精确匹配的持仓文档是连接不完整，不得降成可用空仓，也不得回退旧文档冒充当前批次。
-
-## 持仓字段映射
-
-| 输出字段 | Elasticsearch 字段 |
+| 调用 | 必要返回 |
 |---|---|
-| `symbol` | `symbol` |
-| `name` | `description` |
-| `asset_class` | `asset_class` |
-| `quantity` | `quantity` |
-| `mark_price` | `mark_price` |
-| `market_value` | `position_value` |
-| `average_cost` | `average_cost_price` |
-| `cost_basis` | `cost_basis_money` |
-| `portfolio_weight` | `percent_of_nav` |
-| `currency` | `currency` |
+| 全部未平仓持仓 | 合约描述与标识、资产类型、数量、价格、市值、平均成本、当日盈亏、未实现盈亏、币种 |
+| 账户财务指标 | 净清算值、现金、可用资金、购买力、初始保证金、维持保证金、总持仓市值、杠杆 |
+| 分币种余额 | 各币种现金、已结算现金、股票市值、净清算值、汇率、已实现与未实现盈亏 |
 
-只保留 `quantity != 0` 或 `position_value != 0` 的同批文档；按绝对市值降序、代码升序输出。字段为空时保留 `null`，不得推算。输出不包含 `account_id`、原始文件名、文件名哈希、Flex 配置、ES 凭证或其他密钥；只输出 `source_identifier_present: true/false` 表示连接键中是否存在非空源标识。
+插件调用结果只在本次报告内存中合并。不得把原始工具响应、账户号码、授权信息或内部会话写入晨报、测试夹具、日志或 Git。
+
+## 规范化字段
+
+| 规范字段 | 插件字段与规则 |
+|---|---|
+| `symbol` | `contract_description`；缺失或歧义时写“未提供”，必要时条件调用合约搜索核实 |
+| `contract_id` | `contract_id`；仅用于同次运行内精确识别证券 |
+| `asset_class` | `asset_class` |
+| `quantity` | `position` |
+| `mark_price` | `market_price` |
+| `market_value` | `market_value` |
+| `average_cost` | `average_price` |
+| `cost_basis` | 插件未直接返回时保留 `null`，不得以数量乘均价推算 |
+| `unrealized_pnl` | `unrealized_pnl` |
+| `daily_pnl` | `daily_pnl` |
+| `currency` | `currency` |
+| `portfolio_weight` | `market_value / net_liquidation`；两者为有效数值且净清算值非零时才计算 |
+| `fetched_at` | 最后一次固定插件调用完成时间 |
+
+只保留 `quantity != 0` 或 `market_value != 0` 的持仓。按绝对市值降序、代码升序排列。插件缺失的价格、成本、币种或盈亏保留 `null`，不得推算。
 
 ## 状态分支
 
-- `ready`：存在最新可用且可证明同批的快照；使用 `document_batch_time`、`holdings_as_of` 与 `holdings` 判断新鲜度并开始正式全持仓扫描。
-- `empty`：没有账户文档，或已证明同批的快照没有非零持仓。正式覆盖写“未验证”，停止仓位动作。
-- `incomplete`：账户选择歧义、连接键缺失／错配、候选截断、无精确持仓连接或时间不能证明同批。正式覆盖写“未验证”，停止仓位动作。
-- `source_unavailable`：仓库根、索引或本机 Elasticsearch 不可用。披露错误类别，不展示底层响应、账户 selector、配置或凭证。
+- `ready`：三项固定调用全部成功。允许完整计算组合权重、现金比例、集中度、杠杆和保证金风险。
+- `partial`：持仓成功，但账户财务指标或分币种余额至少一项失败。持仓可正式扫描；缺失字段写“未验证”，禁止仓位百分比、集中度再平衡和条件式加减仓。
+- `empty`：持仓调用成功并明确返回空数组。显示账户当前没有未平仓持仓，不把它当作故障，也不回退其他来源。
+- `source_unavailable`：持仓调用因授权、权限、服务或网络问题失败。正式覆盖显示“未验证”，停止持仓建议，不尝试本地数据回退。
 
-脚本 exit 0 仅代表 `ready`；`empty/incomplete` 为 exit 3，`source_unavailable` 为 exit 2。任何非零 exit 都进入临时范围分支，不得把用户提供的证券写成正式持仓。
+## 新鲜度
+
+记录插件查询时间，不将它描述成券商估值时间。三项固定调用成功且晨报在最后一次调用后 15 分钟内生成时标记 `fresh`；超过 15 分钟标记 `stale`；没有有效查询时间时标记 `unknown`。
+
+`stale` 或 `unknown` 只可输出“观察／刷新插件数据后复核”。报告必须披露失败的调用、查询时间和新鲜度，但不得展示底层认证信息或完整错误响应。
