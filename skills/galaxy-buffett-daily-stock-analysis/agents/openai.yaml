@@ -1,0 +1,4 @@
+interface:
+  display_name: "Galaxy Buffett - Daily Stock Analysis"
+  short_description: "IBKR 持仓驱动的每日美股智能晨报"
+  default_prompt: "使用 $galaxy-buffett-daily-stock-analysis 生成今天的美股与 IBKR 持仓智能晨报。"
