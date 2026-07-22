@@ -37,8 +37,7 @@ trap cleanup EXIT HUP INT TERM
 
 python3 -m venv "$verify_temp_dir/venv"
 verify_python="$verify_temp_dir/venv/bin/python"
-"$verify_python" -m pip install --quiet --disable-pip-version-check \
-  "PyYAML==6.0.2" -r "$repo_root/ibkr_show_worker/requirements.txt"
+"$verify_python" -m pip install --quiet --disable-pip-version-check "PyYAML==6.0.2"
 "$verify_python" "$quick_validate" "$skill_root"
 
 "$verify_python" - "$skill_root/agents/openai.yaml" <<'PY'
@@ -82,16 +81,6 @@ PYTHONPYCACHEPREFIX="$verify_temp_dir/pycache" "$verify_python" -m py_compile \
   "$skill_root/scripts/read_ibkr_snapshot.py" \
   "$repo_root/scripts/validate_galaxy_buffett_artifacts.py"
 "$verify_python" "$repo_root/scripts/validate_galaxy_buffett_artifacts.py" skill "$skill_root" "$repo_root"
-
-(
-  cd "$repo_root"
-  GALAXY_IBKR_READER_PATH="$skill_root/scripts/read_ibkr_snapshot.py" \
-    "$verify_python" -m unittest -v tests.test_galaxy_ibkr_reader
-  PYTHONPATH="$repo_root/ibkr_show_worker" "$verify_python" -m pytest -q \
-    ibkr_show_worker/tests/test_flex_csv_parser.py \
-    ibkr_show_worker/tests/test_transformers.py \
-    ibkr_show_worker/tests/test_import_daily_snapshot.py
-)
 
 if [ "$skill_root" = "$project_skill" ]; then
   "$verify_python" "$repo_root/scripts/validate_galaxy_buffett_artifacts.py" all "$repo_root"

@@ -38,26 +38,40 @@
 | `asset_class` | `asset_class` |
 | `quantity` | `position` |
 | `mark_price` | `market_price` |
-| `market_value` | `market_value` |
+| `market_value` | 插件原始 `market_value`，保留数值但在币种口径未确认前不得用于组合百分比 |
+| `market_value_basis` | 插件明确标示为持仓原币时写 `native`，明确标示为账户基准币时写 `base`，否则写 `unknown`；不得猜测 |
+| `market_value_native` | 仅在 `market_value_basis=native` 时使用原始市值；否则保留 `null` |
+| `base_currency` | 账户财务指标或分币种余额明确返回的账户基准币种 |
+| `net_liquidation_base` | 账户财务指标明确返回的基准币种净清算值；币种口径不明时为 `null` |
+| `fx_to_base` | 插件分币种余额返回、方向明确的“1 单位持仓币种折合多少基准币种”；基准币种自身为 1 |
+| `market_value_base` | 插件明确给出基准币市值时直接使用；否则仅在 `market_value_native` 与 `fx_to_base` 均有效时相乘；其余为 `null` |
 | `average_cost` | `average_price` |
 | `cost_basis` | 插件未直接返回时保留 `null`，不得以数量乘均价推算 |
 | `unrealized_pnl` | `unrealized_pnl` |
 | `daily_pnl` | `daily_pnl` |
 | `currency` | `currency` |
-| `portfolio_weight` | `market_value / net_liquidation`；两者为有效数值且净清算值非零时才计算 |
-| `fetched_at` | 最后一次固定插件调用完成时间 |
+| `portfolio_weight` | `market_value_base / net_liquidation_base`；两者为有效数值且净清算值非零时才计算 |
+| `fetched_at` | 三项固定调用各自的完成时间；报告同时保留最早与最晚时间，不展示内部会话信息 |
 
-只保留 `quantity != 0` 或 `market_value != 0` 的持仓。按绝对市值降序、代码升序排列。插件缺失的价格、成本、币种或盈亏保留 `null`，不得推算。
+只保留 `quantity != 0` 或 `market_value != 0` 的持仓。能够得到 `market_value_base` 时按其绝对值降序，否则把币种口径未验证的记录单列，不跨币种直接排序。插件缺失的价格、成本、币种、汇率或盈亏保留 `null`，不得使用网页汇率或常识补算。
+
+三项账户调用在本次报告内分配固定审计引用：`ACCT-POSITIONS`、`ACCT-METRICS`、`ACCT-BALANCES`。它们记录调用能力、查询时间、状态、可用／缺失字段、计算口径和本次报告实际使用的脱敏规范化数值：
+
+- `ACCT-POSITIONS`：每个持仓的 symbol、asset_class、quantity、currency、mark_price、market_value_basis、market_value_native、fx_to_base、market_value_base、average_cost、daily_pnl、unrealized_pnl；
+- `ACCT-METRICS`：base_currency、net_liquidation_base、cash、available_funds、buying_power、initial_margin、maintenance_margin、excess_liquidity、leverage；
+- `ACCT-BALANCES`：每个币种的 currency、cash、settled_cash、stock_market_value、net_liquidation、fx_to_base 及其查询时间。
+
+不得记录账户号码、原始响应、授权信息或内部会话字段。账户审计记录只存在于用户本地 HTML，不进入 Git、公共测试夹具或公开仓库。
 
 ## 状态分支
 
-- `ready`：三项固定调用全部成功。允许完整计算组合权重、现金比例、集中度、杠杆和保证金风险。
-- `partial`：持仓成功，但账户财务指标或分币种余额至少一项失败。持仓可正式扫描；缺失字段写“未验证”，禁止仓位百分比、集中度再平衡和条件式加减仓。
+- `ready`：三项调用成功且动作关键字段完整。至少包括全部持仓身份／数量／币种、`market_value_basis`、所有非基准币持仓的 `fx_to_base`、`market_value_base`、`base_currency`、`net_liquidation_base`、现金、可用资金、初始与维持保证金；不得存在足以改变权重或风险结论的未解决口径冲突。允许完整计算组合权重、现金比例、集中度、毛／净敞口和保证金风险。
+- `partial`：持仓成功，但其余任一固定调用失败，或上述动作关键字段／币种口径／重要对账不完整。持仓可正式扫描；缺失字段写“未验证”，禁止仓位百分比、集中度再平衡和条件式加减仓。
 - `empty`：持仓调用成功并明确返回空数组。显示账户当前没有未平仓持仓，不把它当作故障，也不回退其他来源。
 - `source_unavailable`：持仓调用因授权、权限、服务或网络问题失败。正式覆盖显示“未验证”，停止持仓建议，不尝试本地数据回退。
 
 ## 新鲜度
 
-记录插件查询时间，不将它描述成券商估值时间。三项固定调用成功且晨报在最后一次调用后 15 分钟内生成时标记 `fresh`；超过 15 分钟标记 `stale`；没有有效查询时间时标记 `unknown`。
+记录插件查询时间，不将它描述成券商估值时间。三项固定调用成功、报告在最早一次固定调用后 15 分钟内生成，且三项调用时间跨度不超过 5 分钟时标记 `fresh`。任一条件超限标记 `stale`；没有全部有效查询时间时标记 `unknown`。报告显示三项查询时间范围，避免最后一次调用掩盖最早持仓数据已经过时。
 
 `stale` 或 `unknown` 只可输出“观察／刷新插件数据后复核”。报告必须披露失败的调用、查询时间和新鲜度，但不得展示底层认证信息或完整错误响应。
